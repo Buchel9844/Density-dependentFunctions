@@ -42,7 +42,7 @@ ui <- fluidPage(
                       min = -1,
                       max = 1,
                       value = 0,
-                      step=0.8),
+                      step=0.01),
           sliderInput("Aslope",
                       label =withMathJax("Per capita effect of one neighbours on species i fecundity \\(A_{N_{j}}:\\)"),
                       min = -1,
@@ -119,8 +119,8 @@ server <- function(input, output) {
     #alpha = Amin - (exp(Aslopes*N)/(1 + abs(exp(Aslopes*N - c))))
     #alpha = Amin/(1 + exp(-Aslopes*(N)))
     #alpha = log(Aslopes*N + 1) + Amin - c
-    alpha =Aslopes*-exp(-c*N) + Amin
-    
+    alpha =Aslopes*exp(-c*N) + Amin
+    #alpha = sqrt(Aslopes*N + Amin)
     
     return(alpha)
   }
