@@ -115,11 +115,11 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output) {
   
-  half.signoidal.function <- function(Amin, Aslopes,c ,N){
+  half.signoidal.function <- function(Amin, Aslopes,c ,N,N0){
     #alpha = Amin - (exp(Aslopes*N)/(1 + abs(exp(Aslopes*N - c))))
     #alpha = Amin/(1 + exp(-Aslopes*(N)))
     #alpha = log(Aslopes*N + 1) + Amin - c
-    alpha =Aslopes*exp(-c*N) + Amin
+    alpha =-Aslopes*exp(-c*(N)) + Amin - c 
     #alpha = sqrt(Aslopes*N + Amin)
     
     return(alpha)
@@ -127,8 +127,8 @@ server <- function(input, output) {
   signoidal.function <- function(Amin, Aslopes, c ,N,N0){
     #alpha = Amin - (exp(Aslopes*N)/(1 + abs(exp(Aslopes*N - c))))
     #alpha = Amin*(exp(-Aslopes*(N-N0)) /(1 + exp(-Aslopes*(N-N0) - c )))
-    e = exp(Aslopes*(N-N0))
-    a = Amin*e
+    e = exp(-Aslopes*(N-N0))
+    a = -e
     d = Amin - c
     alpha = (a/(1 + e)) + d
     
@@ -149,7 +149,7 @@ server <- function(input, output) {
       theme_bw()
     
     
-    f3 <- ggplot(data.frame(N= N, alpha =  half.signoidal.function(Amin, Aslopes,c ,N)), 
+    f3 <- ggplot(data.frame(N= N, alpha =  half.signoidal.function(Amin, Aslopes,c ,N,N0)), 
                  aes(y=alpha, x= N))+
       #geom_smooth(alpha=0.8,color="grey") +
       labs(title="function 3") + 
@@ -214,10 +214,10 @@ server <- function(input, output) {
       br(),
       paste0("function 2: \\({\\alpha}_{ij} = A_{ 0,i,j} + A_{N_{j}} * {N}_j \\)"),
       br(),
-      paste0("function 3: \\({\\alpha}_{ij} = log(A_{N_{j}}{N}_j + 1) + A_{ 0,i,j}- c \\)"),
+      paste0("function 3: \\({\\alpha}_{ij} = -A_{N_{j}}*e^{-c{N}_j} + A_{ 0,i,j}- c \\)"),
       br(),
       br(),
-      paste0("function 4: \\({\\alpha}_{ij} = A_{ 0,i,j}*\\dfrac{e^{A_{N_{j}}({N}_j- N_{0,i})}}{1+e^{A_{N_{j}}({N}_j - N_{0,i})}} + A_{ 0,i,j} - c \\)"),
+      paste0("function 4: \\({\\alpha}_{ij} = \\dfrac{-e^{-A_{N_{j}}({N}_j- N_{0,i})}}{1+e^{-A_{N_{j}}({N}_j - N_{0,i})}} + A_{ 0,i,j} - c \\)"),
       br(),
       paste0("Interaction of j on i when neighbourhood density \\({N}_j = 0\\), is equal to (\\(A_{ 0,i,j}\\))  :", x),
       br(),
@@ -246,7 +246,7 @@ server <- function(input, output) {
     Aslopes = input$Aslope
     c = input$c
     N0 = input$N0
-    Ni = input$N0
+    Ni = 5
     Nj = seq(input$RangeNj[1],
              input$RangeNj[2],1)
     lambda = input$lambda
