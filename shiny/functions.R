@@ -119,7 +119,7 @@ server <- function(input, output) {
     #alpha = Amin - (exp(Aslopes*N)/(1 + abs(exp(Aslopes*N - c))))
     #alpha = Amin/(1 + exp(-Aslopes*(N)))
     #alpha = log(Aslopes*N + 1) + Amin - c
-    alpha =-Aslopes*exp(-c*(N)) + Amin - c 
+    alpha =-Aslopes*exp(-c*(N)) + Amin 
     #alpha = sqrt(Aslopes*N + Amin)
     
     return(alpha)
@@ -127,9 +127,9 @@ server <- function(input, output) {
   signoidal.function <- function(Amin, Aslopes, c ,N,N0){
     #alpha = Amin - (exp(Aslopes*N)/(1 + abs(exp(Aslopes*N - c))))
     #alpha = Amin*(exp(-Aslopes*(N-N0)) /(1 + exp(-Aslopes*(N-N0) - c )))
-    e = exp(-Aslopes*(N-N0))
-    a = -e
-    d = Amin - c
+    e = exp(-c*(N-N0)) # c is stretching the graph horizontally and N0 is translating the graph 
+    a = -Aslopes*e #stretching the graph vertically
+    d = Amin
     alpha = (a/(1 + e)) + d
     
     return(alpha)
@@ -214,10 +214,10 @@ server <- function(input, output) {
       br(),
       paste0("function 2: \\({\\alpha}_{ij} = A_{ 0,i,j} + A_{N_{j}} * {N}_j \\)"),
       br(),
-      paste0("function 3: \\({\\alpha}_{ij} = -A_{N_{j}}*e^{-c{N}_j} + A_{ 0,i,j}- c \\)"),
+      paste0("function 3: \\({\\alpha}_{ij} =  A_{ 0,i,j} - A_{N_{j}}*e^{-c{N}_j} \\)"),
       br(),
       br(),
-      paste0("function 4: \\({\\alpha}_{ij} = \\dfrac{-e^{-A_{N_{j}}({N}_j- N_{0,i})}}{1+e^{-A_{N_{j}}({N}_j - N_{0,i})}} + A_{ 0,i,j} - c \\)"),
+      paste0("function 4: \\({\\alpha}_{ij} = A_{ 0,i,j} - \\dfrac{A_{N_{j}}*e^{-c({N}_j- N_{0,i})}}{1+e^{-c({N}_j - N_{0,i})}}\\)"),
       br(),
       paste0("Interaction of j on i when neighbourhood density \\({N}_j = 0\\), is equal to (\\(A_{ 0,i,j}\\))  :", x),
       br(),
