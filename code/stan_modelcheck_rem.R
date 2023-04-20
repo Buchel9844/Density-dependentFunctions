@@ -128,7 +128,7 @@ stan_post_pred_check <- function(post.draws,
   ppc.plot <- lines(density(stan.data), col = 'black', lwd = 2)  
   print(ppc.plot)
   
-  write.csv(seed_pred_table, file = file.name)
+  write_csv(seed_pred_table, file = file.name)
 }
 
 stan_post_pred_check_APM <- function(post.draws,
@@ -171,5 +171,5 @@ stan_post_pred_check_APM <- function(post.draws,
   ppc.plot <- lines(density(stan.data), col = 'black', lwd = 2)  
   print(ppc.plot)
   
-  write.csv(seed_pred_table, file = file.name)
+  save(list(seed_pred_table), file = file.name)
 }
