@@ -16,11 +16,12 @@ data{
 }
 
 parameters{
-  real<lower=0> lambdas[1];
-  vector<lower=0>[S] m; //slope of the inflation point - specific distribution
-  vector<lower=0>[S] c; //slope of the inflation point - specific distribution
+  real<lower=0> lambdas[1]; // intrinsic growth rate - always positive
+  vector<lower=0>[S] c; //slope of the inflation point - specific distribution - always positive
 
-  vector[S] alpha_function_tilde;
+  vector[S] alpha_initial; // initial effect of j on i - when Nj is minimal
+  vector[S] alpha_slope; // impact of the addition of one individual of j, on the fecundity of i. 
+
     
   real<lower=0> disp_dev; // species-specific dispersion deviation parameter,
   // defined for the negative binomial distribution used to reflect seed production (perform)
@@ -44,16 +45,16 @@ transformed parameters{
 
     for(s in 1:S){
       if(alphaFunct1 ==1){
-      alpha_function_eij[i,s]= alpha_function_tilde[s];
+      alpha_function_eij[i,s]= alpha_initial[s];
       }
       if(alphaFunct2 ==1){
-      alpha_function_eij[i,s]= alpha_function_tilde[s]*SpMatrix[i,s];
+      alpha_function_eij[i,s]= alpha_initial[s] + alpha_slope[s]*(SpMatrix[i,s]-min(SpMatrix[,s]));
       }
       if(alphaFunct3 ==1){
-        alpha_function_eij[i,s] = (alpha_function_tilde[s]*exp(-m[s]*(SpMatrix[i,s] - 0)));
+        alpha_function_eij[i,s] = alpha_initial[s] + alpha_slope[s]*(1 - exp(-c[s]*(SpMatrix[i,s]-min(SpMatrix[,s]))));
       }
       if(alphaFunct4 ==1){
-        alpha_function_eij[i,s] = (alpha_function_tilde[s]*exp(-m[s]*(SpMatrix[i,s] - 0))) / (1 + exp(-m[s]*(SpMatrix[i,s] + 0) - c[s]));
+        alpha_function_eij[i,s] = alpha_initial[s] + (c[s]*(1 - exp(-alpha_slope[s]*(SpMatrix[i,s]-min(SpMatrix[,s])))))/(1+exp(-alpha_slope[s]*(SpMatrix[i,s]-min(SpMatrix[,s]))));
       }
     }
     
@@ -68,10 +69,9 @@ transformed parameters{
 
 model{
   // set regular priors
-  
-  alpha_function_tilde ~ normal(0,1);
+  alpha_initial ~ normal(0,1);
+  alpha_slope ~ normal(0,1);
   lambdas ~ normal(0, 1);
-  m ~ normal(0, 1);
   c ~ normal(0, 1);
   disp_dev ~ cauchy(0, 1);  // safer to place prior on disp_dev than on phi
   
