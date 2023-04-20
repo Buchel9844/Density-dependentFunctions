@@ -22,7 +22,7 @@ library(ggplot2)
 #rstan_options(auto_write = TRUE)
 
 #---- 1.2. Import the Data ----
-setwd("/Users/lisabuche/Projects/Facilitation_density")
+setwd("/Users/lisabuche/Projects/Density-dependentFunctions")
 #### Stouffer's model
 set.seed(1236) #to create reproducible results
 source("code/GenerateSimData-Stouffer.R") # Generate Simulated data in "simulated.data" df and 
@@ -85,24 +85,24 @@ Alphadistribution.neighbours <- data.frame()
 Fecunditydistribution <- data.frame()
 PostFecunditydistribution <- data.frame()
 for(Code.focal in c("i","j")){
-  for (function.int in c(1:4)){
+  for (function.int in c(2:4)){
     print(paste(Code.focal,", function",function.int))
     
     function.vec <- c(0,0,0,0)
     function.vec[function.int] <- 1
 
 # subset for one Code.focal species 
-#SpDataFocal <- simulated.data[which(simulated.data$focal == Code.focal),]
-SpDataFocal <- simdata
+SpDataFocal <- simulated.data[which(simulated.data$focal == Code.focal),]
+#SpDataFocal <- simdata
 SpDataFocal <- SpDataFocal[which(SpDataFocal$focal == Code.focal),]
 
-#SpDataFocal$fecundity[is.na(SpDataFocal$fecundity)] <- 0
+SpDataFocal <- SpDataFocal[complete.cases(SpDataFocal$fecundity),] 
 #SpDataFocal$seeds[is.na(SpDataFocal$seeds)] <- 0
 
 
 # Next continue to extract the data needed to run the model. 
 N <- as.integer(nrow(SpDataFocal))
-Fecundity <- as.integer(SpDataFocal$seeds)  
+Fecundity <- as.integer(SpDataFocal$fecundity)  
 
 #---- 2. ABUDANCE MATRIX----
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -112,7 +112,7 @@ Fecundity <- as.integer(SpDataFocal$seeds)
 #       any species columns with 0 abundance. Save a vector of the species names
 #       corresponding to each column for easy matching later.
 AllSpNames <- names(SpDataFocal)[!names(SpDataFocal) %in% c("time","focal","seeds.i",
-                                                            "seeds.j","fecundity","seeds")]
+                                                            "seeds.j","fecundity","seeds","biomass")]
 
 AllSpAbunds <- SpDataFocal %>% 
   dplyr::select(all_of(AllSpNames))
@@ -189,7 +189,7 @@ source("code/stan_modelcheck_rem.R") # call the functions to check diagnistic pl
 # check the distribution of Rhats and effective sample sizes 
 ##### Posterior check
 stan_post_pred_check(FinalPosteriors,"F_hat",Fecundity,
-                     paste0("results/PostFec_",Code.focal,"_",alpha.function,".csv")) 
+                     paste0("results/PostFec_",Code.focal,"_",alpha.function,".csv.gz")) 
 
 
 # N.B. amount by which autocorrelation within the chains increases uncertainty in estimates can be measured
@@ -202,10 +202,10 @@ hist(summary(FinalFit)$summary[,"n_eff"],
 
 # plot the corresponding graphs
 stan_model_check(FinalFit,
-                 param =c('lambdas','alpha_function_tilde'))
+                 param =c('lambdas','c','alpha_initial','alpha_slope','c'))
 
 # Next check the correlation among key model parameters and identify any
-pairs(FinalFit, pars = c("lambdas", 'alpha_function_tilde'))
+pairs(FinalFit, pars = c("lambdas",'alpha_initial','alpha_slope','c'))
 
 
 dev.off()
@@ -213,8 +213,8 @@ dev.off()
 #---- 3.4. Extraction interactions coefficients---
 
 density.comp <- data.frame(observations= c(1:nrow(SpDataFocal)),
-                           species.i = SpDataFocal$i,
-                           species.j = SpDataFocal$j)
+                           species.i = SpDataFocal$plants.i,
+                           species.j = SpDataFocal$plants.j)
 
 Alphadistribution.i <- tibble()
 Alphadistribution.j <- tibble()
@@ -266,7 +266,7 @@ Fecunditydistribution.n$density.function = alpha.function
 
 Fecunditydistribution <- bind_rows(Fecunditydistribution,Fecunditydistribution.n)
 
-PostFecunditydistribution.n  <- read.csv(paste0("results/PostFec_",Code.focal,"_",alpha.function,".csv"))
+PostFecunditydistribution.n  <- read.csv(paste0("results/PostFec_",Code.focal,"_",alpha.function,".csv.gz"))
 PostFecunditydistribution.n$focal <- Code.focal
 PostFecunditydistribution.n$alpha.function <- alpha.function
   
@@ -277,9 +277,9 @@ PostFecunditydistribution <- bind_rows(PostFecunditydistribution,PostFecunditydi
   }
 }
 
-write_csv(Alphadistribution.neighbours, file = "results/Alphadistribution.neighbours.csv")
-write_csv(Fecunditydistribution, file = "results/Fecunditydistribution.csv")
-write_csv(PostFecunditydistribution , file = "results/PostFecunditydistribution .csv")
+save(Alphadistribution.neighbours, file = "results/Alphadistribution.neighbours.csv.gz")
+save(Fecunditydistribution, file = "results/Fecunditydistribution.csv.gz")
+save(PostFecunditydistribution , file = "results/PostFecunditydistribution.csv.gz")
 
 
 
