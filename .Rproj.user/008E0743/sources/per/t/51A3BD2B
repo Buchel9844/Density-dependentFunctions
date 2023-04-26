@@ -3,9 +3,9 @@
     "path": "~/Documents/Projects/Density-dependentFunctions/code/ModelFit.R",
     "project_path": "code/ModelFit.R",
     "type": "r_source",
-    "hash": "0",
+    "hash": "4079308284",
     "contents": "",
-    "dirty": true,
+    "dirty": false,
     "created": 1681965326069.0,
     "source_on_save": false,
     "relative_order": 3,
@@ -16,11 +16,11 @@
         "scrollLine": "261"
     },
     "folds": "",
-    "lastKnownWriteTime": 1681973362,
+    "lastKnownWriteTime": 1681975928,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1681975577886,
+    "last_content_update": 1681975928293,
     "read_only": false,
     "read_only_alternatives": []
 }

@@ -85,7 +85,7 @@ Alphadistribution.neighbours <- data.frame()
 Fecunditydistribution <- data.frame()
 PostFecunditydistribution <- data.frame()
 for(Code.focal in c("i","j")){
-  for (function.int in c(2:4)){
+  for (function.int in c(1:4)){
     print(paste(Code.focal,", function",function.int))
     
     function.vec <- c(0,0,0,0)
