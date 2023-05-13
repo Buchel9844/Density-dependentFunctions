@@ -69,6 +69,17 @@ fecundity.summary <- fecundity.df %>%
   ungroup()
 
 
+competition.seeds = data.frame()
+for(focal in focal.levels){
+  competition.n <- subset(competition, competition$focal == focal) 
+competition.n$seeds <-  competition.n$flower*
+  rnorm(nrow(competition.n),
+        mean=fecundity.summary$mean.seed[which(fecundity.summary$focal==focal)],
+        sd = fecundity.summary$st.dev.seed[which(fecundity.summary$focal==focal)])
+competition.seeds <- rbind(competition.seeds,competition.n)
+}
+ggplot(competition.seeds,aes(x=seeds, color= focal) ) + geom_density()
+
 #---- 1.3. join competition with seeds production for each focal  ----
 
 focal.levels <- levels(as.factor(competition$focal))
@@ -92,15 +103,17 @@ for(focal in focal.levels){
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #---- 2. Run the model for each focal----
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Fecunditydistribution <- data.frame()
+PostFecunditydistribution <- data_frame()
 for(Code.focal in focal.levels){
 for (function.int in c(1:4)){
   print(paste(Code.focal,", function",function.int))
-  
+  if(Code.focal ==focal.levels[1] & function.int  ==1)next
   function.vec <- c(0,0,0,0)
   function.vec[function.int] <- 1
   
  # data for the focal
-  SpDataFocal <- Spcompetition[[focal]]
+  SpDataFocal <- Spcompetition[[Code.focal]]
  
   # Next continue to extract the data needed to run the model. 
   N <- as.integer(nrow(SpDataFocal))
@@ -170,8 +183,8 @@ for (function.int in c(1:4)){
   options(mc.cores = parallel::detectCores())
   # defiining initial value of lambda to help with computation failure
   list.init <- function(...)list(lambdas = array(as.numeric(rnorm(1,
-                                                                  mean=log(fecundity.summary$mean.seed[which(fecundity.summary$focal==focal)]),
-                                                                  sd = log(fecundity.summary$st.dev.seed[which(fecundity.summary$focal==focal)]))), 
+                                                                  mean=log(fecundity.summary$mean.seed[which(fecundity.summary$focal==Code.focal)]),
+                                                                  sd = abs(log(fecundity.summary$st.dev.seed[which(fecundity.summary$focal==Code.focal)])))), 
                                                             dim = 1))
                                  
   FinalFit <- stan(file = "code/DensityFunct_BH_Final.stan", 
@@ -188,7 +201,7 @@ for (function.int in c(1:4)){
   save(file= paste0("results/FinalFit_",Code.focal,"_",alpha.function,".rds"),
        FinalFit)
   
-  load(paste0("results/FinalFit_",Code.focal,"_",alpha.function,".rds"))
+  #load(paste0("results/FinalFit_",Code.focal,"_",alpha.function,".rds"))
   
   FinalPosteriors <- rstan::extract(FinalFit)
   
@@ -219,63 +232,46 @@ for (function.int in c(1:4)){
                    param =c('lambdas','c','alpha_initial','alpha_slope','c'))
   
   # Next check the correlation among key model parameters and identify any
-  pairs(FinalFit, pars = c("lambdas",'alpha_initial','alpha_slope','c'))
+  #pairs(FinalFit, pars = c("lambdas",'alpha_initial','alpha_slope','c'))
   
   
   dev.off()
+  #---- 3.3. Extract coefficients ---
   
-  #---- 3.4. Extraction interactions coefficients---
+  df_lambda <- FinalFit%>% 
+    as.data.frame() %>% 
+    dplyr::select(starts_with("lambdas[1]"))
   
-  density.comp <- data.frame(observations= c(1:nrow(SpDataFocal)),
-                             species.i = SpDataFocal$plants.i,
-                             species.j = SpDataFocal$plants.j)
+  df_alpha_slope <- FinalFit %>% 
+    as.data.frame() %>% 
+    dplyr::select(starts_with("alpha_slope"))
   
-  Alphadistribution.i <- tibble()
-  Alphadistribution.j <- tibble()
+  df_alpha_init <- FinalFit %>% 
+    as.data.frame() %>% 
+    dplyr::select(starts_with("alpha_init"))
   
-  Alphadistribution.i <- data.frame(FinalPosteriors$alpha_function_eij[,,1])
-  names(Alphadistribution.i) <- c(1:nrow(SpDataFocal))
-  Alphadistribution.i <- gather(Alphadistribution.i, key="observations",value="alpha.i")
-  Alphadistribution.i$observations <- as.numeric(Alphadistribution.i$observations)
-  Alphadistribution.i <- full_join(Alphadistribution.i,density.comp, 
-                                   by=c("observations"))
-  
-  Alphadistribution.j <- as.data.frame(FinalPosteriors$alpha_function_eij[,,2])
-  names(Alphadistribution.j) <- c(1:nrow(SpDataFocal))
-  Alphadistribution.j <- gather(Alphadistribution.j, key="observations",value="alpha.j")
-  Alphadistribution.j$observations <- as.numeric(Alphadistribution.j$observations)
-  Alphadistribution.j <- full_join(Alphadistribution.j,density.comp, by=c("observations"))
+  df_alpha_c <- FinalFit %>% 
+    as.data.frame() %>% 
+    dplyr::select(starts_with("alpha_c"))
   
   
-  Alphadistribution.i <- Alphadistribution.i %>% 
-    group_by(species.i) %>% summarise_at("alpha.i",  list(mean = mean, sd = sd))
+  assign(paste0("Parameters_",Code.focal,"_",alpha.function),
+         list(lambda =  df_lambda,
+       alpha_slope= df_alpha_slope,
+       alpha_init =df_alpha_init,
+       alpha_c = df_alpha_c
+       ))
   
-  Alphadistribution.i <- data.frame(abundance.neighbours = Alphadistribution.i$species.i,
-                                    alpha_mean = Alphadistribution.i$mean,
-                                    alpha_sd= Alphadistribution.i$sd,
-                                    neighbours= "species i",focal = paste("species",Code.focal),
-                                    density.function = alpha.function)
+  save(list =paste0("Parameters_",Code.focal,"_",alpha.function),
+       file = paste0("results/Parameters_",Code.focal,"_",alpha.function,".RData"))
   
-  
-  Alphadistribution.j <- Alphadistribution.j %>% 
-    group_by(species.j) %>% summarise_at("alpha.j",  list(mean = mean, sd = sd))
-  
-  Alphadistribution.j <- data.frame(abundance.neighbours = Alphadistribution.j$species.j,
-                                    alpha_mean = Alphadistribution.j$mean,
-                                    alpha_sd= Alphadistribution.j$sd,
-                                    neighbours= "species j",focal = paste("species",Code.focal),
-                                    density.function = alpha.function)
-  
-  
-  Alphadistribution.neighbours <- bind_rows(Alphadistribution.neighbours,Alphadistribution.i,Alphadistribution.j)
-  
-  #---- 3.4. Extraction fecundity---
+  #---- 3.3. Extraction fecundity---
   
   Fecunditydistribution.n <- FinalPosteriors %>% 
     as.data.frame() %>% 
     dplyr::select(contains("F_sim")) %>%
     gather( key="obervation",value="seed")
-  Fecunditydistribution.n$focal = paste("species",Code.focal)
+  Fecunditydistribution.n$focal = Code.focal
   Fecunditydistribution.n$density.function = alpha.function
   
   Fecunditydistribution <- bind_rows(Fecunditydistribution,Fecunditydistribution.n)
@@ -285,13 +281,97 @@ for (function.int in c(1:4)){
   PostFecunditydistribution.n$alpha.function <- alpha.function
   
   PostFecunditydistribution <- bind_rows(PostFecunditydistribution,PostFecunditydistribution.n)
-  
-  
+
   
 }
 }
+save(Fecunditydistribution, file = "results/NaturalData_Fecunditydistribution.csv.gz")
+save(PostFecunditydistribution , file = "results/NaturalData_PostFecunditydistribution.csv.gz")
+
+#---- 3. Figures ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#---- 3.1 Fecundity posterior distribution ----
+Nat_PostFecundityGraph <- ggplot(PostFecunditydistribution) +
+  geom_density(aes(x=Fec,y=after_stat(scaled),
+                   group=iterations,
+                   color=as.factor(alpha.function)),
+               alpha=0.2) +
+  geom_density(data = competition.seeds , aes(x=seeds, 
+                                                    y=after_stat(scaled),
+                                                    color=as.factor(focal)),
+               alpha=0.5) +
+  facet_wrap(focal ~  alpha.function, ncol=4,scales = "free" ) +
+  #scale_x_continuous(limits = function(x) {x + c(-10, 10)})+
+  scale_x_continuous(limits = c(0,300)) +
+  labs(title = " Fecundity distributions for predictions", y ="Density",
+       x="Fecundity") +  theme_bw() + guides(color="none") #+ 
+  #scale_color_manual(values=c("black","#CC79A7","#E69F00","#009E73",
+  #                            "blue","red"))
+
+#---- 3.1 Alpha distribution ----
+
+focal <- "CETE"
+
+df <- data.frame()
+for(Code.focal in focal.levels){
+  for (function.int in c(1:4)){
+    function.vec <- c(0,0,0,0)
+    function.vec[function.int] <- 1
+    alpha.function <- paste0("function_",which(function.vec==1))
+    
+    load(paste0("results/FinalFit_",Code.focal,"_",alpha.function,".rds"))
+    
+    assign(paste0("FinalFit",Code.focal,"_",alpha.function),FinalFit)
+    rm(FinalFit)
+
+    df_alpha_slope_n <- get(paste0("FinalFit",Code.focal,"_",alpha.function)) %>% 
+      as.data.frame() %>% 
+      dplyr::select(starts_with("alpha_slope"))
+    
+    df_alpha_init <- get(paste0("FinalFit",Code.focal,"_",alpha.function)) %>% 
+      as.data.frame() %>% 
+      dplyr::select(starts_with("alpha_init"))
+    
+    df_alpha_c <- get(paste0("FinalFit",Code.focal,"_",alpha.function)) %>% 
+      as.data.frame() %>% 
+      dplyr::select(starts_with("alpha_c"))
+    
+    
+    names(df_alpha_n) <-c("lambda","alpha","gamma_H","gamma_FV")
+    df_alpha_n$focal <- Code.focal
+    df_alpha_n$year <- year
+    df_alpha_n$complexity.plant <- complexity.plant
+    df_alpha_n$complexity.animal <- complexity.animal
+    df<- bind_rows(df,df_alpha_n)
+    
+  }
+}
+write.csv(df,
+          file = paste0("~/Eco_Bayesian/Complexity_caracoles/results/Chapt1_df_alpha",focal,".csv"))
+df <- read.csv(paste0("~/Eco_Bayesian/Complexity_caracoles/results/Chapt1_df_alpha",focal,".csv"))
+
+assign(paste0("df_param_",focal),df)
 
 
+
+
+Nat_PostFecundityGraph <- ggplot(PostFecunditydistribution) +
+  geom_density(aes(x=Fec,y=after_stat(scaled),
+                   group=iterations,
+                   color=as.factor(alpha.function)),
+               alpha=0.2) +
+  geom_density(data = competition.seeds , aes(x=seeds, 
+                                              y=after_stat(scaled),
+                                              color=as.factor(focal)),
+               alpha=0.5) +
+  facet_wrap(focal ~  alpha.function, ncol=4,scales = "free" ) +
+  #scale_x_continuous(limits = function(x) {x + c(-10, 10)})+
+  scale_x_continuous(limits = c(0,300)) +
+  labs(title = " Fecundity distributions for predictions", y ="Density",
+       x="Fecundity") +  theme_bw() + guides(color="none") #+ 
+#scale_color_manual(values=c("black","#CC79A7","#E69F00","#009E73",
+#                            "blue","red"))
 
 
 

@@ -150,7 +150,7 @@ server <- function(input, output) {
       geom_line(aes(colour = after_stat(y < 0)))+      
       guides(color="none") + labs(title="function 1") + 
       geom_hline(yintercept=0,linetype="dashed") +
-      xlab("Neighbour density of j") + ylab("per capita effect of j on i") +
+      xlab("Neighbour density of j") + ylab("Resulting effect of j on i") +
       theme_bw() +
       if(Amin <0){
         scale_colour_manual(
