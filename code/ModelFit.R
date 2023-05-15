@@ -35,8 +35,9 @@ ggsave("figures/simulated.seed.density.pdf",
 plot = ggplot(simulated.data, aes(x=fecundity, fill=focal, color=focal)) + geom_density(alpha=0.5) + 
   scale_x_continuous(trans='log2',
                      name = "Viable seed, fecundity per individuals (ln transformed)") + 
-  theme_bw() 
+  theme_bw() + scale_color_manual(values=c("blue","red")) + scale_fill_manual(values=c("blue","red"))
 )
+
 
 biomass.sim <- c("focal species i","focal species j")
 names(biomass.sim) <- c("biomass.i", "biomass.j")
@@ -45,7 +46,7 @@ ggsave("figures/simulated.biomass.abundance.pdf",
                             key="focal.biomass", value="biomass"),
                             ending.plants.i, ending.plants.j,
                             key="focal.ending.plants", value="ending.plants")) +
-         geom_smooth(aes(y=biomass, x=per.capita.fecundity.i,
+         geom_smooth(aes(y=biomass, x=ending.plants,
                          color=focal.ending.plants,
                          fill=focal.ending.plants)) +
          facet_grid(.~focal.biomass, 
@@ -60,9 +61,10 @@ ggsave("figures/simulated.biomass.abundance.pdf",
 )
 
 ggplot(experimental.outcomes) +
-  geom_smooth(aes(y=per.capita.fecundity.j, x=per.capita.fecundity.i))
+  geom_smooth(aes(y=per.capita.fecundity.j, x=per.capita.fecundity.i), color= "black")+ theme_bw() 
+
 ggplot(experimental.outcomes) +
-  geom_point(aes(y=biomass.j, x=per.capita.fecundity.i)) 
+  geom_point(aes(y=biomass.j, x=biomass.i)) + theme_bw() 
 #### Ricker model Data
 source("code/simul_data.R")
 set.seed(16)
@@ -219,14 +221,14 @@ density.comp <- data.frame(observations= c(1:nrow(SpDataFocal)),
 Alphadistribution.i <- tibble()
 Alphadistribution.j <- tibble()
 
-Alphadistribution.i <- data.frame(FinalPosteriors$alpha_function_eij[,,1])
+Alphadistribution.i <- data.frame(FinalPosteriors$alpha_value[,,1])
 names(Alphadistribution.i) <- c(1:nrow(SpDataFocal))
 Alphadistribution.i <- gather(Alphadistribution.i, key="observations",value="alpha.i")
 Alphadistribution.i$observations <- as.numeric(Alphadistribution.i$observations)
 Alphadistribution.i <- full_join(Alphadistribution.i,density.comp, 
                                  by=c("observations"))
 
-Alphadistribution.j <- as.data.frame(FinalPosteriors$alpha_function_eij[,,2])
+Alphadistribution.j <- as.data.frame(FinalPosteriors$alpha_value[,,2])
 names(Alphadistribution.j) <- c(1:nrow(SpDataFocal))
 Alphadistribution.j <- gather(Alphadistribution.j, key="observations",value="alpha.j")
 Alphadistribution.j$observations <- as.numeric(Alphadistribution.j$observations)

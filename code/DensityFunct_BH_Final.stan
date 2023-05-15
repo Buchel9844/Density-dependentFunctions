@@ -16,7 +16,7 @@ data{
 }
 
 parameters{
-  real<lower=0> lambdas[1]; // intrinsic growth rate - always positive
+  vector<lower=0>[1] lambdas; // intrinsic growth rate - always positive
   vector<lower=0>[S] c; //slope of the inflation point - specific distribution - always positive
 
   vector[S] alpha_initial; // initial effect of j on i - when Nj is minimal
@@ -37,6 +37,7 @@ transformed parameters{
   
  // loop parameters
   matrix[N,S] alpha_function_eij;
+  matrix[N,S] alpha_value;
   vector[N] lambda_ei;
   
   // implement the biological model
@@ -45,23 +46,25 @@ transformed parameters{
 
     for(s in 1:S){
       if(alphaFunct1 ==1){
-      alpha_function_eij[i,s]= alpha_initial[s];
+      alpha_value[i,s]= alpha_initial[s];
+      alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct2 ==1){
-      alpha_function_eij[i,s]= alpha_initial[s] + alpha_slope[s]*(SpMatrix[i,s]-min(SpMatrix[,s]));
+       alpha_value[i,s] = alpha_initial[s] + alpha_slope[s]*(SpMatrix[i,s]-min(SpMatrix[,s]));
+      alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct3 ==1){
-        alpha_function_eij[i,s] = alpha_initial[s] + alpha_slope[s]*(1 - exp(-c[s]*(SpMatrix[i,s]-min(SpMatrix[,s]))));
+         alpha_value[i,s] = alpha_initial[s] + alpha_slope[s]*(1 - exp(-c[s]*(SpMatrix[i,s]-min(SpMatrix[,s]))));
+      alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct4 ==1){
-        alpha_function_eij[i,s] = alpha_initial[s] + (c[s]*(1 - exp(-alpha_slope[s]*(SpMatrix[i,s]-min(SpMatrix[,s])))))/(1+exp(-alpha_slope[s]*(SpMatrix[i,s]-min(SpMatrix[,s]))));
+         alpha_value[i,s]= alpha_initial[s] + (c[s]*(1 - exp(-alpha_slope[s]*(SpMatrix[i,s]-min(SpMatrix[,s])))))/(1+exp(-alpha_slope[s]*(SpMatrix[i,s]-min(SpMatrix[,s]))));
+      alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
     }
     
  F_hat[i] = exp(lambda_ei[i] + sum(alpha_function_eij[i,]));
 
-
-         // F_hat[i] = exp(lambda_ei[i] + interaction_effects[i] + pollinator_effects[i] + HOI_effects[i]);
 
   }
 

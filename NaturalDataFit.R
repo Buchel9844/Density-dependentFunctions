@@ -290,72 +290,9 @@ save(PostFecunditydistribution , file = "results/NaturalData_PostFecunditydistri
 
 #---- 3. Figures ----
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+load("results/NaturalData_PostFecunditydistribution.csv.gz")
 
 #---- 3.1 Fecundity posterior distribution ----
-Nat_PostFecundityGraph <- ggplot(PostFecunditydistribution) +
-  geom_density(aes(x=Fec,y=after_stat(scaled),
-                   group=iterations,
-                   color=as.factor(alpha.function)),
-               alpha=0.2) +
-  geom_density(data = competition.seeds , aes(x=seeds, 
-                                                    y=after_stat(scaled),
-                                                    color=as.factor(focal)),
-               alpha=0.5) +
-  facet_wrap(focal ~  alpha.function, ncol=4,scales = "free" ) +
-  #scale_x_continuous(limits = function(x) {x + c(-10, 10)})+
-  scale_x_continuous(limits = c(0,300)) +
-  labs(title = " Fecundity distributions for predictions", y ="Density",
-       x="Fecundity") +  theme_bw() + guides(color="none") #+ 
-  #scale_color_manual(values=c("black","#CC79A7","#E69F00","#009E73",
-  #                            "blue","red"))
-
-#---- 3.1 Alpha distribution ----
-
-focal <- "CETE"
-
-df <- data.frame()
-for(Code.focal in focal.levels){
-  for (function.int in c(1:4)){
-    function.vec <- c(0,0,0,0)
-    function.vec[function.int] <- 1
-    alpha.function <- paste0("function_",which(function.vec==1))
-    
-    load(paste0("results/FinalFit_",Code.focal,"_",alpha.function,".rds"))
-    
-    assign(paste0("FinalFit",Code.focal,"_",alpha.function),FinalFit)
-    rm(FinalFit)
-
-    df_alpha_slope_n <- get(paste0("FinalFit",Code.focal,"_",alpha.function)) %>% 
-      as.data.frame() %>% 
-      dplyr::select(starts_with("alpha_slope"))
-    
-    df_alpha_init <- get(paste0("FinalFit",Code.focal,"_",alpha.function)) %>% 
-      as.data.frame() %>% 
-      dplyr::select(starts_with("alpha_init"))
-    
-    df_alpha_c <- get(paste0("FinalFit",Code.focal,"_",alpha.function)) %>% 
-      as.data.frame() %>% 
-      dplyr::select(starts_with("alpha_c"))
-    
-    
-    names(df_alpha_n) <-c("lambda","alpha","gamma_H","gamma_FV")
-    df_alpha_n$focal <- Code.focal
-    df_alpha_n$year <- year
-    df_alpha_n$complexity.plant <- complexity.plant
-    df_alpha_n$complexity.animal <- complexity.animal
-    df<- bind_rows(df,df_alpha_n)
-    
-  }
-}
-write.csv(df,
-          file = paste0("~/Eco_Bayesian/Complexity_caracoles/results/Chapt1_df_alpha",focal,".csv"))
-df <- read.csv(paste0("~/Eco_Bayesian/Complexity_caracoles/results/Chapt1_df_alpha",focal,".csv"))
-
-assign(paste0("df_param_",focal),df)
-
-
-
-
 Nat_PostFecundityGraph <- ggplot(PostFecunditydistribution) +
   geom_density(aes(x=Fec,y=after_stat(scaled),
                    group=iterations,
@@ -370,8 +307,63 @@ Nat_PostFecundityGraph <- ggplot(PostFecunditydistribution) +
   scale_x_continuous(limits = c(0,300)) +
   labs(title = " Fecundity distributions for predictions", y ="Density",
        x="Fecundity") +  theme_bw() + guides(color="none") #+ 
-#scale_color_manual(values=c("black","#CC79A7","#E69F00","#009E73",
-#                            "blue","red"))
+  #scale_color_manual(values=c("black","#CC79A7","#E69F00","#009E73",
+  #                            "blue","red"))
+
+#---- 3.1 Alpha distribution ----
+
+
+df <- data.frame()
+
+for(Code.focal in focal.levels){
+  for (function.int in c(1:4)){
+    df_alpha_n<- data.frame()
+    function.vec <- c(0,0,0,0)
+    function.vec[function.int] <- 1
+    alpha.function <- paste0("function_",which(function.vec==1))
+    
+    load(paste0("results/FinalFit_",Code.focal,"_",alpha.function,".rds"))
+    
+    assign(paste0("FinalFit",Code.focal,"_",alpha.function),FinalFit)
+    rm(FinalFit)
+
+    df_alpha_n <- get(paste0("FinalFit",Code.focal,"_",alpha.function)) %>% 
+      as.data.frame() %>% 
+      dplyr::select(starts_with("alpha_init")) %>%
+      summarise_all( mean) %>% 
+      gather(key = "observation", value="alpha_initial")%>% 
+      mutate(observation = c(1:nlevels(as.factor(observation))))
+    
+    if (function.int > 1){
+      df_alpha_slope_n <- get(paste0("FinalFit",Code.focal,"_",alpha.function)) %>% 
+        as.data.frame() %>% 
+        dplyr::select(starts_with("alpha_slope"))%>%
+        summarise_all( mean) %>% 
+        gather(key = "observation", value="alpha_slope")%>% 
+        mutate(observation = c(1:nrow(  df_alpha)))
+      
+      df_alpha_n <- left_join(    df_alpha_n, df_alpha_slope_n)
+      
+     if (function.int > 2){
+    df_alpha_c <- get(paste0("FinalFit",Code.focal,"_",alpha.function)) %>% 
+      as.data.frame() %>% 
+      dplyr::select(starts_with("c")) %>%
+      summarise_all( mean) %>% 
+      gather(key = "observation", value="alpha_c")%>% 
+      mutate(observation = c(1:nrow(  df_alpha)))
+    
+    df_alpha_n <- left_join(    df_alpha_n,  df_alpha_c)
+     }
+    }
+    
+    df_alpha_n$focal <- Code.focal
+    df_alpha_n$alpha_function <- alpha.function
+  }
+}
+
+Nat_alphas_param <- df
+save(Nat_alphas_param,
+     file=("Nat_alphas_param.csv.gz"))
 
 
 
