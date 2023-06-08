@@ -62,8 +62,8 @@ load("results/PostFecunditydistribution.csv.gz")
 
 simdata <- read.csv("results/simulated.data.csv")
 
-Fecunditydistribution.n <- data.frame(seed=simulated.data$fecundity,
-                                    focal=simulated.data$focal,
+Fecunditydistribution.n <- data.frame(seed=simdata$fecundity,
+                                    focal=simdata$focal,
                                     obervation= NA )
                                     #max.seed= NA,
                                     #alpha.function = "initial.seed"
@@ -74,13 +74,12 @@ Fecunditydistribution.n <- data.frame(seed=simulated.data$fecundity,
 Post_Fecunditydistribution <- PostFecunditydistribution %>%
   filter(!is.na(Fec))
 
-PostFecundityGraph <- ggplot(Post_Fecunditydistribution) +
-  geom_density(aes(x=Fec,y=after_stat(scaled),
+PostFecundityGraph <- ggplot(PostFecunditydistribution) +
+  geom_density(aes(x=Fec,
                   group=iterations,
                   color=as.factor(alpha.function)),
                alpha=0.2) +
   geom_density(data = Fecunditydistribution.n , aes(x=seed, 
-                                          y=after_stat(scaled),
                                           color=as.factor(focal)),
                alpha=0.5) +
   facet_wrap(focal ~  alpha.function, nrow=2, scales = "free" ) +

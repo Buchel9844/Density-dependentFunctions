@@ -23,7 +23,22 @@ library(ggplot2)
 
 #---- 1.2. Import the Data ----
 setwd("/Users/lisabuche/Projects/Density-dependentFunctions")
-#### Stouffer's model
+#### MALYON's model ####
+set.seed(1236) #to create reproducible results
+source("code/GenerateSimData-Malyon.R")
+simdata$fecundity <- as.numeric(simdata$fecundity)
+simdata$Spi <- as.numeric(simdata$Spi)
+simdata$Spj <- as.numeric(simdata$Spj)
+ggsave("figures/simulated.seed.density.pdf",
+       plot = ggplot(simdata, aes(x=seeds, fill=as.factor(focal), color=as.factor(focal))) + 
+         geom_density(alpha=0.5) + 
+         scale_x_continuous(trans='log2',
+                            name = "Viable seed, fecundity per individuals (ln transformed)") + 
+         theme_bw() + scale_color_manual(values=c("blue","red")) + 
+         scale_fill_manual(values=c("blue","red"))
+)
+
+#### Stouffer's model ####
 set.seed(1236) #to create reproducible results
 source("code/GenerateSimData-Stouffer.R") # Generate Simulated data in "simulated.data" df and 
 write_csv(simulated.data, 
@@ -35,7 +50,16 @@ ggsave("figures/simulated.seed.density.pdf",
 plot = ggplot(simulated.data, aes(x=fecundity, fill=focal, color=focal)) + geom_density(alpha=0.5) + 
   scale_x_continuous(trans='log2',
                      name = "Viable seed, fecundity per individuals (ln transformed)") + 
-  theme_bw() + scale_color_manual(values=c("blue","red")) + scale_fill_manual(values=c("blue","red"))
+  theme_bw() + scale_color_manual(values=c("blue","red")) + 
+  scale_fill_manual(values=c("blue","red"))
+)
+
+
+ggsave("figures/simulated.seed.overtime.pdf",
+       plot = ggplot(simulated.data, aes(y=fecundity,x=as.factor(time), 
+                                         fill=focal, color=focal)) + 
+         geom_boxplot() + 
+         theme_bw() 
 )
 
 
@@ -49,8 +73,8 @@ ggsave("figures/simulated.biomass.abundance.pdf",
          geom_smooth(aes(y=biomass, x=ending.plants,
                          color=focal.ending.plants,
                          fill=focal.ending.plants)) +
-         facet_grid(.~focal.biomass, 
-                    labeller = labeller(focal.biomass = biomass.sim))+ 
+         #facet_grid(.~focal.biomass, 
+          #          labeller = labeller(focal.biomass = biomass.sim))+ 
          ylim(c(0,1)) +theme_bw() + guides(fill="none") +
          scale_color_discrete(name = "Neighbour \nbiomass",labels=c("species i", "species j")) +
          xlab("abundance focal species") +
@@ -63,9 +87,15 @@ ggsave("figures/simulated.biomass.abundance.pdf",
 ggplot(experimental.outcomes) +
   geom_smooth(aes(y=per.capita.fecundity.j, x=per.capita.fecundity.i), color= "black")+ theme_bw() 
 
-ggplot(experimental.outcomes) +
-  geom_point(aes(y=biomass.j, x=biomass.i)) + theme_bw() 
-#### Ricker model Data
+ggplot(experimental.outcomes[which(experimental.outcomes$focal=="j"),]) +
+  geom_point(aes(y=biomass.j, x=time)) + theme_bw() 
+ggplot(experimental.outcomes[which(experimental.outcomes$focal=="j"),]) +
+  geom_point(aes(y=per.capita.fecundity.j, x=time, color=starting.plants.j)) + theme_bw()
+
+ggplot(experimental.outcomes[which(experimental.outcomes$focal=="i"),]) +
+  geom_point(aes(y=per.capita.fecundity.i, x=time, color=starting.plants.i)) + theme_bw() 
+
+#### Ricker model Data ####
 source("code/simul_data.R")
 set.seed(16)
 simul_data_ricker <- simul_data(S = 2,   # number of focal groups / species
@@ -82,7 +112,11 @@ ggsave("figures/Ricker.fecundity.pdf",
          theme_bw() 
 )
 simul_data_ricker$sim_alpha_specific
+
+
+
 #---- 1.3. Set parameters ----
+simdata <- simulated.data
 Alphadistribution.neighbours <- data.frame()
 Fecunditydistribution <- data.frame()
 PostFecunditydistribution <- data.frame()
@@ -94,9 +128,9 @@ for(Code.focal in c("i","j")){
     function.vec[function.int] <- 1
 
 # subset for one Code.focal species 
-SpDataFocal <- simulated.data[which(simulated.data$focal == Code.focal),]
+SpDataFocal <- simdata[which(simdata$focal == Code.focal),]
 #SpDataFocal <- simdata
-SpDataFocal <- SpDataFocal[which(SpDataFocal$focal == Code.focal),]
+#SpDataFocal <- SpDataFocal[which(SpDataFocal$focal == Code.focal),]
 
 SpDataFocal <- SpDataFocal[complete.cases(SpDataFocal$fecundity),] 
 #SpDataFocal$seeds[is.na(SpDataFocal$seeds)] <- 0
@@ -114,7 +148,8 @@ Fecundity <- as.integer(SpDataFocal$fecundity)
 #       any species columns with 0 abundance. Save a vector of the species names
 #       corresponding to each column for easy matching later.
 AllSpNames <- names(SpDataFocal)[!names(SpDataFocal) %in% c("time","focal","seeds.i",
-                                                            "seeds.j","fecundity","seeds","biomass")]
+                                                            "seeds.j","fecundity",
+                                                            "seeds","biomass")]
 
 AllSpAbunds <- SpDataFocal %>% 
   dplyr::select(all_of(AllSpNames))
@@ -138,7 +173,7 @@ SpNames <- AllSpNames[SpToKeep]
 
 #assign(paste0("SpNames_",FocalPrefix),
 #     SpNames)
-Intra <- ifelse(SpNames == Code.focal, 1, 0)
+Intra <- ifelse(SpNames == paste0("plants.",Code.focal), 1, 0)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #---- 3. BAYES FIT----
@@ -215,8 +250,8 @@ dev.off()
 #---- 3.4. Extraction interactions coefficients---
 
 density.comp <- data.frame(observations= c(1:nrow(SpDataFocal)),
-                           species.i = SpDataFocal$plants.i,
-                           species.j = SpDataFocal$plants.j)
+                           species.i = SpDataFocal$Spi,
+                           species.j = SpDataFocal$Spj)
 
 Alphadistribution.i <- tibble()
 Alphadistribution.j <- tibble()

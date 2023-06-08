@@ -62,7 +62,7 @@ odeintr::compile_sys(
     "nu_j",
     "r_i",
     "r_j",
-    "K_i",
+    "K_i", 
     "K_j",
     "beta_i",
     "beta_j",
@@ -76,18 +76,18 @@ odeintr::compile_sys(
 #######################################
 # response surface experimental design
 #######################################
+# number of experimental replicates to simulate
+nreps <- 10
 
 # data frame for model inputs and outputs
 experimental.design <- data.frame(
-  focal = c(rep("i",5), rep("j", 5)),
-  starting.plants.i = round(abs(rnorm(100, mean = 0, sd = 3))), #c(3, 2, 1, 1, 1, 2, 1, 0, 0, 0),#round(abs(rnorm(10, mean = 0, sd = 3))), #BucheL change from a set vector
-  starting.plants.j = round(abs(rnorm(100, mean = 0, sd = 3))), #c(3, 2, 1, 1, 1, 2, 1, 0, 0, 0),#round(abs(rnorm(10, mean = 0, sd = 3))), #BucheL change from a set vector
-  time = rep(1, 10),
+  focal = c(rep("i",10), rep("j", 10)),
+  starting.plants.i =round(abs(rnorm(10*nreps, mean = 10, sd = 3))), #c(3, 2, 1, 1, 1, 2, 1, 0, 0, 0),#round(abs(rnorm(10, mean = 0, sd = 3))), #BucheL change from a set vector
+  starting.plants.j = round(abs(rnorm(10*nreps, mean = 10, sd = 3))), #c(3, 2, 1, 1, 1, 2, 1, 0, 0, 0),#round(abs(rnorm(10, mean = 0, sd = 3))), #BucheL change from a set vector
+  time = rep(c(1:10),nreps),
   stringsAsFactors = FALSE
 )
 
-# number of experimental replicates to simulate
-nreps <- 10
 
 #####################################
 # parameters for the fecundity model
@@ -96,15 +96,15 @@ nreps <- 10
 # define all parameter values
 # paired values are always ordered (i, j)
 params <- list(
-  gamma = c(0.0, 0.0), # germination rate of seeds
+  gamma = c(0.1, 0.1), # germination rate of seeds
   mu    = c(0.0, 0.0), # mortality rate of seeds
-  nu    = c(0.0, 0.0), # mortality rate of ind
-  r     = c(10.0, 5.0), # intrinsic growth rate
+  nu    = c(0.10, 0.10), # mortality rate of ind
+  r     = c(15.0, 5.0), # intrinsic growth rate
   K     = c(1.0, 1.0), # carrying capacity
   beta  = c(0.001, 0.001),# biomass of germinant 
-  phi   = c(500, 250), # convertion rate from biomass to seed
-  alpha_ij = 0.50,
-  alpha_ji = 0.70
+  phi   = c(750, 250), # convertion rate from biomass to seed
+  alpha_ij = 0.10,
+  alpha_ji = 0.50
 )
 
 ########################################################
@@ -181,7 +181,7 @@ for(rr in 1:nrow(experimental.outcomes)){
   seeds_j <- biomass_j * params$phi[2]
   fecundity_j <- seeds_j / plants_j
   
-  # fillin the outcomes into the table
+  # filling the outcomes into the table
   experimental.outcomes[rr,5:12] <- c(
     plants_i,
     plants_j,
