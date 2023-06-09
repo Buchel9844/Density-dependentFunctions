@@ -33,14 +33,14 @@ AlphadistributionGraph <- ggplot(Alphadistribution.neighbours, aes(x= abundance.
   geom_point(aes(
     color=density.function,
     fill=density.function)) +
-  #ylim(-5,5)+
+  #ylim(-0.1,0.1)+
   geom_hline(yintercept=0,color="dark grey") +
   xlim(0,max(Alphadistribution.neighbours$abundance.neighbours)) + 
   geom_errorbar(aes(ymin=alpha_mean-alpha_sd^2, ymax=alpha_mean+alpha_sd^2,
                     color=density.function), width=.2,
                               position=position_dodge(0.05)) +
-  facet_grid(neighbours ~ focal,scale="free") + theme_bw() + 
-  guides(fill="none")+
+  facet_grid( focal ~ neighbours,scale="free", switch="both") + theme_bw() + 
+  guides(fill="none",color="none")+
   scale_color_manual("Density-dependent functions",values=c("black","#CC79A7","#E69F00","#009E73")) +
   labs(title="Direct interactions distributions of the 4 density-dependent functions", 
        y="Resulting effect", x=" Neighbour density ")

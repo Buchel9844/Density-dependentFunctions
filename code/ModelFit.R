@@ -1,8 +1,5 @@
-# This script will run the empirical model fits for each focal species and each
-#       environmental covariate. A separate script will then make the empirical
-#       figures for the manuscript
+# This script ...
 
-# https://mc-stan.org/docs/2_29/functions-reference/index.html#overview
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #---- 1. SET UP: Import data, create df with abundances----
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -39,7 +36,7 @@ ggsave("figures/simulated.seed.density.pdf",
 )
 
 #### Stouffer's model ####
-set.seed(1236) #to create reproducible results
+set.seed(1654) #to create reproducible results
 source("code/GenerateSimData-Stouffer.R") # Generate Simulated data in "simulated.data" df and 
 write_csv(simulated.data, 
            file = "results/simulated.data.csv")
@@ -47,53 +44,23 @@ write_csv(experimental.outcomes,
            file = "results/experimental.outcomes.csv")
 head(simulated.data)
 ggsave("figures/simulated.seed.density.pdf",
-plot = ggplot(simulated.data, aes(x=fecundity, fill=focal, color=focal)) + geom_density(alpha=0.5) + 
-  scale_x_continuous(trans='log2',
-                     name = "Viable seed, fecundity per individuals (ln transformed)") + 
-  theme_bw() + scale_color_manual(values=c("blue","red")) + 
-  scale_fill_manual(values=c("blue","red"))
+plot = ggplot(simulated.data) + 
+  geom_density( aes(x=fecundity,color=focal,fill=focal),alpha=0.6) +
+  scale_color_manual(values=c("blue","red")) +
+  scale_fill_manual(values=c("blue","red")) +
+  xlab("Viable seed, fecundity per individuals") + 
+  theme_bw()
+)
+ggsave("figures/simulated.seed.biomass.pdf",
+       plot = ggplot(experimental.outcomes) + 
+  geom_point( aes(x=biomass.i,y=biomass.j)) +
+  #geom_smooth( aes(x=biomass.i,y=biomass.j),color="grey",alpha=0.6) +
+  #xlim(0.875,1)+
+  #ylim(0,0.6) +
+  theme_bw()+
+  labs(title="Biomass of species j in function of biomass of species i")
 )
 
-
-ggsave("figures/simulated.seed.overtime.pdf",
-       plot = ggplot(simulated.data, aes(y=fecundity,x=as.factor(time), 
-                                         fill=focal, color=focal)) + 
-         geom_boxplot() + 
-         theme_bw() 
-)
-
-
-biomass.sim <- c("focal species i","focal species j")
-names(biomass.sim) <- c("biomass.i", "biomass.j")
-ggsave("figures/simulated.biomass.abundance.pdf",
-       plot = ggplot(gather(gather(experimental.outcomes, biomass.i, biomass.j,
-                            key="focal.biomass", value="biomass"),
-                            ending.plants.i, ending.plants.j,
-                            key="focal.ending.plants", value="ending.plants")) +
-         geom_smooth(aes(y=biomass, x=ending.plants,
-                         color=focal.ending.plants,
-                         fill=focal.ending.plants)) +
-         #facet_grid(.~focal.biomass, 
-          #          labeller = labeller(focal.biomass = biomass.sim))+ 
-         ylim(c(0,1)) +theme_bw() + guides(fill="none") +
-         scale_color_discrete(name = "Neighbour \nbiomass",labels=c("species i", "species j")) +
-         xlab("abundance focal species") +
-         labs(caption = expression("with interaction coefficients"~alpha[ij]==0.9~"and"~alpha[ji]==0.7)) +
-         theme(plot.caption.position = "plot",
-               plot.caption = element_text(hjust = 0,size=11))
-    
-)
-
-ggplot(experimental.outcomes) +
-  geom_smooth(aes(y=per.capita.fecundity.j, x=per.capita.fecundity.i), color= "black")+ theme_bw() 
-
-ggplot(experimental.outcomes[which(experimental.outcomes$focal=="j"),]) +
-  geom_point(aes(y=biomass.j, x=time)) + theme_bw() 
-ggplot(experimental.outcomes[which(experimental.outcomes$focal=="j"),]) +
-  geom_point(aes(y=per.capita.fecundity.j, x=time, color=starting.plants.j)) + theme_bw()
-
-ggplot(experimental.outcomes[which(experimental.outcomes$focal=="i"),]) +
-  geom_point(aes(y=per.capita.fecundity.i, x=time, color=starting.plants.i)) + theme_bw() 
 
 #### Ricker model Data ####
 source("code/simul_data.R")
@@ -250,8 +217,8 @@ dev.off()
 #---- 3.4. Extraction interactions coefficients---
 
 density.comp <- data.frame(observations= c(1:nrow(SpDataFocal)),
-                           species.i = SpDataFocal$Spi,
-                           species.j = SpDataFocal$Spj)
+                           species.i = SpDataFocal$plants.i,
+                           species.j = SpDataFocal$plants.j)
 
 Alphadistribution.i <- tibble()
 Alphadistribution.j <- tibble()

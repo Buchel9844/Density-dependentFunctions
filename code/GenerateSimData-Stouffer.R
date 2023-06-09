@@ -82,8 +82,8 @@ nreps <- 10
 # data frame for model inputs and outputs
 experimental.design <- data.frame(
   focal = c(rep("i",10), rep("j", 10)),
-  starting.plants.i =round(abs(rnorm(10*nreps, mean = 10, sd = 3))), #c(3, 2, 1, 1, 1, 2, 1, 0, 0, 0),#round(abs(rnorm(10, mean = 0, sd = 3))), #BucheL change from a set vector
-  starting.plants.j = round(abs(rnorm(10*nreps, mean = 10, sd = 3))), #c(3, 2, 1, 1, 1, 2, 1, 0, 0, 0),#round(abs(rnorm(10, mean = 0, sd = 3))), #BucheL change from a set vector
+  starting.plants.i =round(abs(rnorm(10*nreps, mean = 4, sd = 5))), #c(3, 2, 1, 1, 1, 2, 1, 0, 0, 0),#round(abs(rnorm(10, mean = 0, sd = 3))), #BucheL change from a set vector
+  starting.plants.j = round(abs(rnorm(10*nreps, mean = 4, sd = 5))), #c(3, 2, 1, 1, 1, 2, 1, 0, 0, 0),#round(abs(rnorm(10, mean = 0, sd = 3))), #BucheL change from a set vector
   time = rep(c(1:10),nreps),
   stringsAsFactors = FALSE
 )
@@ -96,17 +96,16 @@ experimental.design <- data.frame(
 # define all parameter values
 # paired values are always ordered (i, j)
 params <- list(
-  gamma = c(0.1, 0.1), # germination rate of seeds
-  mu    = c(0.0, 0.0), # mortality rate of seeds
-  nu    = c(0.10, 0.10), # mortality rate of ind
-  r     = c(15.0, 5.0), # intrinsic growth rate
-  K     = c(1.0, 1.0), # carrying capacity
-  beta  = c(0.001, 0.001),# biomass of germinant 
-  phi   = c(750, 250), # convertion rate from biomass to seed
-  alpha_ij = 0.10,
-  alpha_ji = 0.50
+gamma = c(0.00, 0.001), # germination rate of seeds
+mu    = c(0.10, 0.20), # mortality rate of seeds
+nu    = c(0.20, 0.05), # mortality rate of ind
+r     = c(10.00, 10.00), # intrinsic growth rate
+K     = c(100.0, 250.0), # carrying capacity
+beta  = c(0.2, 0.2), # biomass of germinant 
+alpha_ij = 0.05, #competitive effect of j on i
+alpha_ji = 0.50, #competitive effect of i on j
+phi   = c(10,25) # conversion rate from biomass to seed
 )
-
 ########################################################
 # simulate the outcomes the response-surface experiment
 ########################################################
@@ -211,8 +210,8 @@ simulated.data <- do.call(rbind,apply(
       focal=rep(x["focal"], nreps),
       plants.i=rep(as.integer(x["starting.plants.i"]), nreps),
       plants.j=rep(as.integer(x["starting.plants.j"]), nreps),
-      seeds.i=0,
-      seeds.j=0,
+      seeds.i=as.numeric(x["seeds.i"]),
+      seeds.j=as.numeric(x["seeds.j"]),
       time=as.numeric(x["time"]),
       biomass=as.numeric(x[paste0("biomass.",x["focal"])]),
       fecundity=rpois(nreps, as.numeric(x[paste0("per.capita.fecundity.",x["focal"])])),
