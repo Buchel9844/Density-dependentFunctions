@@ -20,70 +20,13 @@ library(ggplot2)
 
 #---- 1.2. Import the Data ----
 setwd("/Users/lisabuche/Projects/Density-dependentFunctions")
-#### MALYON's model ####
-set.seed(1236) #to create reproducible results
-source("code/GenerateSimData-Malyon.R")
-simdata$fecundity <- as.numeric(simdata$fecundity)
-simdata$Spi <- as.numeric(simdata$Spi)
-simdata$Spj <- as.numeric(simdata$Spj)
-ggsave("figures/simulated.seed.density.pdf",
-       plot = ggplot(simdata, aes(x=seeds, fill=as.factor(focal), color=as.factor(focal))) + 
-         geom_density(alpha=0.5) + 
-         scale_x_continuous(trans='log2',
-                            name = "Viable seed, fecundity per individuals (ln transformed)") + 
-         theme_bw() + scale_color_manual(values=c("blue","red")) + 
-         scale_fill_manual(values=c("blue","red"))
-)
-
-#### Stouffer's model ####
-set.seed(1654) #to create reproducible results
-source("code/GenerateSimData-Stouffer.R") # Generate Simulated data in "simulated.data" df and 
-write_csv(simulated.data, 
-           file = "results/simulated.data.csv")
-write_csv(experimental.outcomes, 
-           file = "results/experimental.outcomes.csv")
-head(simulated.data)
-ggsave("figures/simulated.seed.density.pdf",
-plot = ggplot(simulated.data) + 
-  geom_density( aes(x=fecundity,color=focal,fill=focal),alpha=0.6) +
-  scale_color_manual(values=c("blue","red")) +
-  scale_fill_manual(values=c("blue","red")) +
-  xlab("Viable seed, fecundity per individuals") + 
-  theme_bw()
-)
-ggsave("figures/simulated.seed.biomass.pdf",
-       plot = ggplot(experimental.outcomes) + 
-  geom_point( aes(x=biomass.i,y=biomass.j)) +
-  #geom_smooth( aes(x=biomass.i,y=biomass.j),color="grey",alpha=0.6) +
-  #xlim(0.875,1)+
-  #ylim(0,0.6) +
-  theme_bw()+
-  labs(title="Biomass of species j in function of biomass of species i")
-)
-
-
-#### Ricker model Data ####
-source("code/simul_data.R")
-set.seed(16)
-simul_data_ricker <- simul_data(S = 2,   # number of focal groups / species
-  K = 2,   # number of neighbour focals 
-  pI = 0.1) # Generate Simulated data in "simulated.data" df and
-simdata <- simul_data_ricker$simdata
-cols.num <- c("seeds","i","j")
-simdata[cols.num] <- sapply(simdata[cols.num],as.numeric)
-
-ggsave("figures/Ricker.fecundity.pdf",
-       plot = ggplot(simdata, aes(x=log(seeds), color=as.factor(focal))) + 
-         geom_density(alpha=0.5) + 
-         scale_x_continuous(name = "Viable seed, fecundity per individuals (log transformed)") + 
-         theme_bw() 
-)
-simul_data_ricker$sim_alpha_specific
-
+source(code/GenerateSimData_wrapper.R)
+Generate.experimental.outcomes <- read.csv("results/Generate.experimental.outcomes.csv")
+Generate.simulated.data <- read.csv("results/Generate.simulated.data.csv")
 
 
 #---- 1.3. Set parameters ----
-simdata <- simulated.data
+simdata <- Generate.simulated.data[which(Generate.simulated.data$sim==1),]
 Alphadistribution.neighbours <- data.frame()
 Fecunditydistribution <- data.frame()
 PostFecunditydistribution <- data.frame()
