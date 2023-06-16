@@ -5,7 +5,7 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # the community dynamics over 10 seasons is as followed:
-source("code\GenerateConitunousData-Stouffer.R")
+source("code\GenerateContinuousData-Stouffer.R")
 
 # communities fecundities and abundances are stored on two csv
 Generate.simulated.data <- NULL

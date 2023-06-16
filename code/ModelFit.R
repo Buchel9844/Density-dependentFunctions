@@ -8,6 +8,8 @@ rm(list = ls())
 #---- 1.1. Import packages ----
 #install.packages("rstan", repos = "https://cloud.r-project.org/", dependencies = TRUE)
 library(rstan)
+#install.packages("loo")
+library(loo) # Efficient approximate leave-one-out cross-validation
 #install.packages("HDInterval")
 library("HDInterval")
 #install.packages("tidyverse")
@@ -30,8 +32,8 @@ simdata <- Generate.simulated.data[which(Generate.simulated.data$sim==1),]
 Alphadistribution.neighbours <- data.frame()
 Fecunditydistribution <- data.frame()
 PostFecunditydistribution <- data.frame()
-for(Code.focal in c("i","j")){
-  for (function.int in c(1:4)){
+for(Code.focal in c("i","j")){ #,"j"
+  for (function.int in c(1:4)){ # c(1:4)
     print(paste(Code.focal,", function",function.int))
     
     function.vec <- c(0,0,0,0)
@@ -44,7 +46,6 @@ SpDataFocal <- simdata[which(simdata$focal == Code.focal),]
 
 SpDataFocal <- SpDataFocal[complete.cases(SpDataFocal$fecundity),] 
 #SpDataFocal$seeds[is.na(SpDataFocal$seeds)] <- 0
-
 
 # Next continue to extract the data needed to run the model. 
 N <- as.integer(nrow(SpDataFocal))
@@ -110,8 +111,8 @@ print("Final Fit beginning")
 #install.packages("codetools")
 library("codetools")
 options(mc.cores = parallel::detectCores())
-FinalFit <- stan(file = "code/DensityFunct_BH_Final.stan", 
-                 data = DataVec,
+FinalFit <- rstan::stan(file = "code/DensityFunct_BH_Final.stan", 
+                  data = DataVec,
                   init="random",
                   warmup= 500,
                   iter = 1000, 
@@ -131,6 +132,10 @@ print("Final Fit done")
 
 ##### Diagnostic plots and post prediction 
 pdf(paste0("figures/FinalFit_",Code.focal,"_",alpha.function,".pdf"))
+# Extract pointwise log-likelihood
+# using merge_chains=FALSE returns an array, which is easier to 
+# use with relative_eff()
+
 # Internal checks of the behaviour of the Bayes Modelsummary(PrelimFit)
 source("code/stan_modelcheck_rem.R") # call the functions to check diagnistic plots
 # check the distribution of Rhats and effective sample sizes 
@@ -138,6 +143,15 @@ source("code/stan_modelcheck_rem.R") # call the functions to check diagnistic pl
 stan_post_pred_check(FinalPosteriors,"F_hat",Fecundity,
                      paste0("results/PostFec_",Code.focal,"_",alpha.function,".csv.gz")) 
 
+log_lik_2 <- loo::extract_log_lik(FinalFit, 
+                                  parameter_name = "F_sim", 
+                                  merge_chains = F)
+
+r_eff <- loo::relative_eff(exp(log_lik_2), cores = 2) 
+
+loo_1 <- loo::loo(log_lik_2 , r_eff = r_eff, cores = 2)
+
+print(loo_1)
 
 # N.B. amount by which autocorrelation within the chains increases uncertainty in estimates can be measured
 hist(summary(FinalFit)$summary[,"Rhat"],
@@ -148,14 +162,30 @@ hist(summary(FinalFit)$summary[,"n_eff"],
                   Code.focal," and ",alpha.function))
 
 # plot the corresponding graphs
-stan_model_check(FinalFit,
-                 param =c('lambdas','c','alpha_initial','alpha_slope','c'))
-
+#stan_model_check(FinalFit,
+ #                param =c('lambdas','c','alpha_initial','alpha_slope','c'))
 # Next check the correlation among key model parameters and identify any
-pairs(FinalFit, pars = c("lambdas",'alpha_initial','alpha_slope','c'))
+#pairs(FinalFit, pars = c("lambdas",'alpha_initial','alpha_slope','c'))
 
+# functions from Rstan pacakges
+stan_trace(FinalFit, pars=c('lambdas','c','alpha_initial','alpha_slope','c'),
+           inc_warmup = TRUE)
+stan_dens(FinalFit, pars=c('lambdas','c','alpha_initial','alpha_slope','c'))
+stan_plot(FinalFit, pars=c('lambdas','c','alpha_initial','alpha_slope','c'))
+
+sampler_params <- get_sampler_params(FinalFit, inc_warmup = TRUE)
+summary(do.call(rbind, sampler_params), digits = 2)
+pairs(FinalFit, pars = c("lambdas",'alpha_initial',
+                         'alpha_slope','c'))
+#The below-diagonal intersection and the above-diagonal intersection of the same two variables should have distributions that are mirror images of each other.
+#Any yellow points would indicate transitions where the maximum treedepth__ was hit, and red points indicate a divergent transition.
+
+
+#print(loo_1)
 
 dev.off()
+
+library(car)
 
 #---- 3.4. Extraction interactions coefficients---
 

@@ -72,9 +72,9 @@ transformed parameters{
 
 model{
   // set regular priors
-  alpha_initial ~ normal(0,1);
-  alpha_slope ~ normal(0,1);
-  lambdas ~ normal(0, 1);
+  alpha_initial ~ normal(0,0.1);
+  alpha_slope ~ normal(0,0.1);
+  lambdas ~ cauchy(0, 10);
   c ~ normal(0, 1);
   disp_dev ~ cauchy(0, 1);  // safer to place prior on disp_dev than on phi
   
@@ -89,7 +89,7 @@ generated quantities{
     if(run_estimation==1){
  for(i in 1:N){
     if(Fecundity[i] <= 0) break ;
-    F_sim[i] = neg_binomial_2_rng(Fecundity[i],(disp_dev^2)^(-1));
+    F_sim[i] = neg_binomial_2_lpmf(Fecundity[i]|F_hat[i],(disp_dev^2)^(-1));
               }
     }
 }

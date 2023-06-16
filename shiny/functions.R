@@ -228,7 +228,7 @@ server <- function(input, output) {
     }
     
     
-    Fi <- lambda + aii*Ni + aij*Nj
+    Fi <- lambda* exp(aii*Ni + aij*Nj)
     return(Fi)
   }
   output$Conditions <- renderUI({

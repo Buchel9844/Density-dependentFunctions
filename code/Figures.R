@@ -40,7 +40,7 @@ AlphadistributionGraph <- ggplot(Alphadistribution.neighbours, aes(x= abundance.
                     color=density.function), width=.2,
                               position=position_dodge(0.05)) +
   facet_grid( focal ~ neighbours,scale="free", switch="both") + theme_bw() + 
-  guides(fill="none",color="none")+
+  guides(fill="none")+
   scale_color_manual("Density-dependent functions",values=c("black","#CC79A7","#E69F00","#009E73")) +
   labs(title="Direct interactions distributions of the 4 density-dependent functions", 
        y="Resulting effect", x=" Neighbour density ")
@@ -92,6 +92,38 @@ PostFecundityGraph <- ggplot(PostFecunditydistribution) +
 ggsave("figures/PostFecundityGraph.pdf",
        plot = PostFecundityGraph)
 
+#---- 2.0. Compare model for each focal  ----
+# reference : Vehtari, A., Gelman, A., and Gabry, J. (2017). Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC. Statistics and Computing. 27(5), 1413–1432. :10.1007/s11222-016-9696-4. online, arXiv preprint arXiv:1507.04544.
+model.loo <- list()
+for(Code.focal in c("i","j")){ #,"j"
+  for (function.int in c(1:4)){ # c(1:4)
+    
+load(paste0("results/FinalFit_",Code.focal,"_function_",function.int,".rds"))
+    # Extract pointwise log-likelihood
+    # using merge_chains=FALSE returns an array, which is easier to 
+    # use with relative_eff()
+log_lik <- loo::extract_log_lik(FinalFit, 
+                                  parameter_name = "F_sim", 
+                                  merge_chains = F)
+#as of loo v2.0.0 we can optionally provide relative effective sample sizes
+# when calling loo, which allows for better estimates of the PSIS effective
+# sample sizes and Monte Carlo error
+r_eff <- loo::relative_eff(exp(log_lik), cores = 2) 
+# preferably use more than 2 cores (as many cores as possible)
+# will use value of 'mc.cores' option if cores is not specified
+model.loo[[paste0(Code.focal,"_function_",function.int)]] <- loo::loo(log_lik, 
+                                                               r_eff = r_eff, cores = 2)
+remove(FinalFit)
+
+  }
+}
+for(Code.focal in c("i","j")){ #,"j"
+comp <- loo_compare(model.loo[[paste0(Code.focal,"_","function_1")]], 
+                    model.loo[[paste0(Code.focal,"_","function_2")]],
+                    model.loo[[paste0(Code.focal,"_","function_3")]],
+                    model.loo[[paste0(Code.focal,"_","function_4")]])
+model.loo[[Code.focal]] <- comp # The first column shows the difference in ELPD relative to the model with the largest ELPD.
+}
 
 ##########################################################################################################
 # 2. Empirical data
