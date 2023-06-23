@@ -5,44 +5,6 @@ library(odeintr)
 # to use/run the 2sp model
 #source('lib/model.2sp.R')
 
-#################################################
-# define initial conditions and model parameters
-#################################################
-
-# initial conditions for viable seeds in seed bank
-N0 <- c(770, 25000)
-
-# number of years to simulate
-nyears <- 10
-
-# define all parameter values for seed germination phase
-# paired values are always ordered (i, j)
-params.seed <- list(
-  T     = 0.50,
-  gamma = c(0.10, 0.01),# germination rate of seeds
-  mu    = c(0.10, 0.20), # mortality rate of seeds
-  nu    = c(0.00, 0.00), # mortality rate of ind
-  r     = c(0.00, 0.00), # intrinsic growth rate
-  K     = c(100.0, 250.0), # carrying capacity
-  beta  = c(0.02, 0.02), # biomass of germinant 
-  alpha_ij = -0.1,
-  alpha_ji = 0.50
-) 
-
-# define all parameter values for plant growth phase
-# paired values are always ordered (i, j)
-params.plant <- list(
-  T     = 0.50,
-    gamma = c(0.00, 0.001), # germination rate of seeds
-    mu    = c(0.10, 0.20), # mortality rate of seeds
-    nu    = c(0.20, 0.05), # mortality rate of ind
-    r     = c(10.00, 10.00), # intrinsic growth rate
-    K     = c(100.0, 250.0), # carrying capacity
-    beta  = c(0.2, 0.2), # biomass of germinant 
-    alpha_ij = 0.05, #competitive effect of j on i
-    alpha_ji = 0.50, #competitive effect of i on j
-    phi   = c(10,25) # conversion rate from biomass to seed
-  )
 
 ################################################
 # simulate continuous-time population dynamics
@@ -135,12 +97,13 @@ for(year in 0:(nyears-1)){
   # add this last step to the population dynamics
   population.dynamics <- rbind(population.dynamics, end.state)
 }
-
+write.csv(population.dynamics ,
+          file = paste0("results/Generate.population.dynamics.",scenario,".csv"))
 ###################################################
 # plot two-species population-dynamics time series 
 ###################################################
-
-dev.new(width=16,height=7)
+pdf(paste0("figures/simulated.com.dynamics.",scenario,".pdf"))
+#dev.new(width=16,height=7)
 par(oma=c(0,0,0,0), mar=c(4.5,5,4,2))
 layout(mat = matrix(
   1:6,
@@ -226,3 +189,4 @@ plot(
   ylab=expression("Plant biomass ("*italic(B[j])*")"),
   xlim=c(0,nyears)
 )
+dev.off()

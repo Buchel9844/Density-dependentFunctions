@@ -18,29 +18,95 @@ library("tidyverse")
 library(dplyr)
 library(ggpubr)
 library(ggplot2)
+library(odeintr)
+library(brms)
+library(bbmle)
 #rstan_options(auto_write = TRUE)
 
 #---- 1.2. Import the Data ----
-setwd("/Users/lisabuche/Projects/Density-dependentFunctions")
-source(code/GenerateSimData_wrapper.R)
-Generate.experimental.outcomes <- read.csv("results/Generate.experimental.outcomes.csv")
-Generate.simulated.data <- read.csv("results/Generate.simulated.data.csv")
+#####################################
+Ricker = F
+Stouffer= T
+Malyon= F
 
+# define initial conditions and model parameters
+# define all parameter values
+# paired values are always ordered (i, j)
+
+run = T
+for( scenario in c("low","medium","high")){
+
+# initial conditions for viable seeds in seed bank
+N0 <- c(5000,5000)
+time.exp <- 3 # number of years of data collected
+
+# number of years to simulate
+nyears <- 20
+params.low <- list(
+  mu    = c(0.10, 0.05), # mortality rate of seeds
+  nu    = c(0.10, 0.05), # mortality rate of ind
+  alpha_ij = 0.5 , #competitive effect of j on i
+  alpha_ji = 0.1 #competitive effect of i on j
+)
+
+params.medium <- list(
+  mu    = c(0.10, 0.15), # mortality rate of seeds
+  nu    = c(0.10, 0.15), # mortality rate of ind
+  alpha_ij = 0.15 , #competitive effect of j on i
+  alpha_ji = 0.10 #competitive effect of i on j
+
+)
+params.high <- list(
+  mu    = c(0.10, 0.50), # mortality rate of seeds
+  nu    = c(0.10, 0.50), # mortality rate of ind
+  alpha_ij = 0.05 , #competitive effect of j on i
+  alpha_ji = 0.10 #competitive effect of i on j
+)
+params <- append(get(paste0("params.",scenario)),
+                 list( # constant parameters
+                   T     = 0.50,
+                   gamma = c(0.0001, 0.00001), # germination rate of seeds
+                   r     = c(10.00, 10.00), # intrinsic growth rate
+                   K     = c(100.0, 100.0), # carrying capacity
+                   beta  = c(0.2, 0.2), # biomass of germinant 
+                   phi   = c(10,10) # conversion rate from biomass to seed
+                 ))
+
+params.plant <- params #for plant growth phase
+
+params.seed <- append(get(paste0("params.",scenario)), # for seed growth phase
+                      list( # constant parameters
+                        T     = 0.50,
+                        gamma = c(0.001, 0.001), # germination rate of seeds
+                        r     = c(0.00, 0.00), # intrinsic growth rate
+                        K     = c(100.0, 100.0), # carrying capacity
+                        beta  = c(0.2, 0.2) # biomass of germinant 
+                      ))
+
+#for seed germination phase
+source("code/GenerateSimData_wrapper.R")
+#Generate.experimental.outcomes <- read.csv("results/Generate.experimental.outcomes.csv")
+#Generate.simulated.data <- read.csv("results/Generate.simulated.data.csv")
 
 #---- 1.3. Set parameters ----
-simdata <- Generate.simulated.data[which(Generate.simulated.data$sim==1),]
+simdata <- simulated.data
 Alphadistribution.neighbours <- data.frame()
 Fecunditydistribution <- data.frame()
 PostFecunditydistribution <- data.frame()
+nspec <- length(c("i","j"))
 for(Code.focal in c("i","j")){ #,"j"
   for (function.int in c(1:4)){ # c(1:4)
-    print(paste(Code.focal,", function",function.int))
+    
+    print(paste(scenario, Code.focal,", function",function.int))
     
     function.vec <- c(0,0,0,0)
     function.vec[function.int] <- 1
 
 # subset for one Code.focal species 
+    
 SpDataFocal <- simdata[which(simdata$focal == Code.focal),]
+SpDataFocal <- SpDataFocal[which(SpDataFocal$time <= time.exp),]
+
 #SpDataFocal <- simdata
 #SpDataFocal <- SpDataFocal[which(SpDataFocal$focal == Code.focal),]
 
@@ -99,7 +165,10 @@ alphaFunct4 <- function.vec[4]
 
 alpha.function <- paste0("function_",which(function.vec==1))
 
-DataVec <- c("N", "S",
+Nmax <- c(SpDataFocal[which.max(SpDataFocal$fecundity),"plants.i"], 
+          SpDataFocal[which.max(SpDataFocal$fecundity),"plants.j"])
+
+DataVec <- c("N", "S","Nmax",
              "Fecundity", "SpMatrix",
              "Intra","run_estimation","alphaFunct1",
              "alphaFunct2","alphaFunct3","alphaFunct4")
@@ -111,18 +180,46 @@ print("Final Fit beginning")
 #install.packages("codetools")
 library("codetools")
 options(mc.cores = parallel::detectCores())
+list.init <- function(...)list(lambdas= array(abs(as.numeric(rnorm(1,mean = 5,
+                                                                   sd= 2), dim = 1))))
+if(run == T){
 FinalFit <- rstan::stan(file = "code/DensityFunct_BH_Final.stan", 
                   data = DataVec,
-                  init="random",
-                  warmup= 500,
-                  iter = 1000, 
-                  chains = 3)
+                  init=list.init,
+                  control=list(max_treedepth=10),
+                  warmup= 1500,
+                  iter = 3000, 
+                  chains = 4,
+                  seed=1616)
 
+# for function 3 and 4 with divergence, rerun by giving my informative init.value from function 2 values
+if( alpha.function >=3 & max(summary(FinalFit)$summary[,"Rhat"],na.rm =T) >1.1 ){
+  load(paste0("results/FinalFit_",scenario,"_",Code.focal,"_function_",2,".rds"))
+  lambdas = array(c(summary(FinalFit)$summary['lambdas[1]',"mean"]), dim = 1)
+  alpha_initial = array(c(summary(FinalFit)$summary['alpha_initial[1]',"mean"],
+                          summary(FinalFit)$summary['alpha_initial[2]',"mean"]), dim = nspec)
+  alpha_slope = array(c(summary(FinalFit)$summary['alpha_slope[1]',"mean"],
+                        summary(FinalFit)$summary['alpha_slope[2]',"mean"]), dim = nspec)
+  
+  list.init <- function(...)list(lambdas= lambdas,
+                                 alpha_initial = alpha_initial,
+                                 alpha_slope =  alpha_slope )
+  remove(FinalFit)
+  FinalFit <- rstan::stan(file = "code/DensityFunct_BH_Final.stan", 
+                          data = DataVec,
+                          init=list.init,
+                          control=list(max_treedepth=12),
+                          warmup= 1500,
+                          iter = 3000, 
+                          chains = 4,
+                          seed=16)
+  remove(lambdas,alpha_initial,alpha_slope)
+}
 
-save(file= paste0("results/FinalFit_",Code.focal,"_",alpha.function,".rds"),
+save(file= paste0("results/FinalFit_",scenario,"_",Code.focal,"_",alpha.function,".rds"),
      FinalFit)
-
-load(paste0("results/FinalFit_",Code.focal,"_",alpha.function,".rds"))
+}
+load(paste0("results/FinalFit_",scenario,"_",Code.focal,"_",alpha.function,".rds"))
 
 FinalPosteriors <- rstan::extract(FinalFit)
 
@@ -131,7 +228,7 @@ print("Final Fit done")
 #---- 3.3. Final fit posterior check and behavior checks---- 
 
 ##### Diagnostic plots and post prediction 
-pdf(paste0("figures/FinalFit_",Code.focal,"_",alpha.function,".pdf"))
+pdf(paste0("figures/FinalFit_",scenario,"_",Code.focal,"_",alpha.function,".pdf"))
 # Extract pointwise log-likelihood
 # using merge_chains=FALSE returns an array, which is easier to 
 # use with relative_eff()
@@ -141,7 +238,8 @@ source("code/stan_modelcheck_rem.R") # call the functions to check diagnistic pl
 # check the distribution of Rhats and effective sample sizes 
 ##### Posterior check
 stan_post_pred_check(FinalPosteriors,"F_hat",Fecundity,
-                     paste0("results/PostFec_",Code.focal,"_",alpha.function,".csv.gz")) 
+                     paste0("results/PostFec_",scenario,"_",
+                            Code.focal,"_",alpha.function,".csv.gz")) 
 
 log_lik_2 <- loo::extract_log_lik(FinalFit, 
                                   parameter_name = "F_sim", 
@@ -168,11 +266,15 @@ hist(summary(FinalFit)$summary[,"n_eff"],
 #pairs(FinalFit, pars = c("lambdas",'alpha_initial','alpha_slope','c'))
 
 # functions from Rstan pacakges
-stan_trace(FinalFit, pars=c('lambdas','c','alpha_initial','alpha_slope','c'),
+trace <- stan_trace(FinalFit, pars=c('lambdas','c','alpha_initial','alpha_slope','c'),
            inc_warmup = TRUE)
-stan_dens(FinalFit, pars=c('lambdas','c','alpha_initial','alpha_slope','c'))
-stan_plot(FinalFit, pars=c('lambdas','c','alpha_initial','alpha_slope','c'))
-
+print(trace)
+dens <- stan_dens(FinalFit, 
+          pars=c('lambdas','c','alpha_initial','alpha_slope','c'))
+print(dens)
+splot <- stan_plot(FinalFit, 
+          pars=c('lambdas','c','alpha_initial','alpha_slope','c'))
+print(splot)
 sampler_params <- get_sampler_params(FinalFit, inc_warmup = TRUE)
 summary(do.call(rbind, sampler_params), digits = 2)
 pairs(FinalFit, pars = c("lambdas",'alpha_initial',
@@ -217,7 +319,8 @@ Alphadistribution.i <- data.frame(abundance.neighbours = Alphadistribution.i$spe
                                          alpha_mean = Alphadistribution.i$mean,
                                          alpha_sd= Alphadistribution.i$sd,
                                          neighbours= "species i",focal = paste("species",Code.focal),
-                                         density.function = alpha.function)
+                                         density.function = alpha.function,
+                                         Nmax = Nmax[1])
 
 
 Alphadistribution.j <- Alphadistribution.j %>% 
@@ -227,7 +330,8 @@ Alphadistribution.j <- data.frame(abundance.neighbours = Alphadistribution.j$spe
                                   alpha_mean = Alphadistribution.j$mean,
                                   alpha_sd= Alphadistribution.j$sd,
                                   neighbours= "species j",focal = paste("species",Code.focal),
-                                  density.function = alpha.function)
+                                  density.function = alpha.function,
+                                  Nmax = Nmax[2])
 
 
 Alphadistribution.neighbours <- bind_rows(Alphadistribution.neighbours,Alphadistribution.i,Alphadistribution.j)
@@ -243,10 +347,10 @@ Fecunditydistribution.n$density.function = alpha.function
 
 Fecunditydistribution <- bind_rows(Fecunditydistribution,Fecunditydistribution.n)
 
-PostFecunditydistribution.n  <- read.csv(paste0("results/PostFec_",Code.focal,"_",alpha.function,".csv.gz"))
+PostFecunditydistribution.n  <- read.csv(paste0("results/PostFec_",scenario,"_",Code.focal,"_",alpha.function,".csv.gz"))
 PostFecunditydistribution.n$focal <- Code.focal
 PostFecunditydistribution.n$alpha.function <- alpha.function
-  
+
 PostFecunditydistribution <- bind_rows(PostFecunditydistribution,PostFecunditydistribution.n)
 
 
@@ -254,11 +358,11 @@ PostFecunditydistribution <- bind_rows(PostFecunditydistribution,PostFecunditydi
   }
 }
 
-save(Alphadistribution.neighbours, file = "results/Alphadistribution.neighbours.csv.gz")
-save(Fecunditydistribution, file = "results/Fecunditydistribution.csv.gz")
-save(PostFecunditydistribution , file = "results/PostFecunditydistribution.csv.gz")
+save(Alphadistribution.neighbours, file = paste0("results/Alphadistribution.",scenario,".neighbours.csv.gz"))
+save(Fecunditydistribution, file = paste0("results/Fecunditydistribution.",scenario,".csv.gz"))
+save(PostFecunditydistribution , file = paste0("results/PostFecunditydistribution.",scenario,".csv.gz"))
 
-
+}
 
 
 

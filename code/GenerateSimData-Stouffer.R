@@ -12,9 +12,6 @@
 # we use this to compile the dynamic model
 #install.packages("odeintr")
 #install.packages("brms")
-library(odeintr)
-library(brms)
-library(bbmle)
 #install.packages("bbmle")
 
 
@@ -88,24 +85,6 @@ experimental.design <- data.frame(
   stringsAsFactors = FALSE
 )
 
-
-#####################################
-# parameters for the fecundity model
-#####################################
-
-# define all parameter values
-# paired values are always ordered (i, j)
-params <- list(
-gamma = c(0.00, 0.001), # germination rate of seeds
-mu    = c(0.10, 0.20), # mortality rate of seeds
-nu    = c(0.20, 0.05), # mortality rate of ind
-r     = c(10.00, 10.00), # intrinsic growth rate
-K     = c(100.0, 250.0), # carrying capacity
-beta  = c(0.2, 0.2), # biomass of germinant 
-alpha_ij = 0.05, #competitive effect of j on i
-alpha_ji = 0.50, #competitive effect of i on j
-phi   = c(10,25) # conversion rate from biomass to seed
-)
 ########################################################
 # simulate the outcomes the response-surface experiment
 ########################################################

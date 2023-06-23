@@ -4,6 +4,7 @@
 data{
   int<lower = 1> N;  // Number of plots/obs
   int<lower = 1> S;  // Number of species
+  int<lower = 0> Nmax[S]; // density at max fecundity 
   int Fecundity[N];  // Fecundity of the focal species in each plot
   matrix[N,S] SpMatrix;  // Matrix of abundances for each species (including abundances of non-focal individuals of the focal species)
   int<lower = 0> Intra[S];  // Indicator boolean variable to identify the focal species (0 for non-focal and 1 for focal). Included for easier calculations
@@ -16,11 +17,11 @@ data{
 }
 
 parameters{
-  vector<lower=0>[1] lambdas; // intrinsic growth rate - always positive
-  vector<lower=0>[S] c; //slope of the inflation point - specific distribution - always positive
+  vector<lower=0,upper=10>[1] lambdas; // intrinsic growth rate - always positive
+  vector<lower=0,upper =1>[S] c; //slope of the inflation point - specific distribution - always positive
 
-  vector[S] alpha_initial; // initial effect of j on i - when Nj is minimal
-  vector[S] alpha_slope; // impact of the addition of one individual of j, on the fecundity of i. 
+  vector<lower=-1,upper =1>[S] alpha_initial; // initial effect of j on i - when Nj is minimal
+  vector<lower=-1,upper =1>[S] alpha_slope; // impact of the addition of one individual of j, on the fecundity of i. 
 
     
   real<lower=0> disp_dev; // species-specific dispersion deviation parameter,
@@ -50,20 +51,20 @@ transformed parameters{
       alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct2 ==1){
-       alpha_value[i,s] = alpha_initial[s] + alpha_slope[s]*(SpMatrix[i,s]-min(SpMatrix[,s]));
+       alpha_value[i,s] = alpha_initial[s] + alpha_slope[s]*(SpMatrix[i,s]-Nmax[s]);
       alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct3 ==1){
-         alpha_value[i,s] = alpha_initial[s] + alpha_slope[s]*(1 - exp(-c[s]*(SpMatrix[i,s]-min(SpMatrix[,s]))));
+         alpha_value[i,s] = alpha_initial[s] + alpha_slope[s]*(1 - exp(-c[s]*(SpMatrix[i,s]-Nmax[s])));
       alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct4 ==1){
-         alpha_value[i,s]= alpha_initial[s] + (c[s]*(1 - exp(-alpha_slope[s]*(SpMatrix[i,s]-min(SpMatrix[,s])))))/(1+exp(-alpha_slope[s]*(SpMatrix[i,s]-min(SpMatrix[,s]))));
+         alpha_value[i,s]= alpha_initial[s] + (c[s]*(1 - exp(-alpha_slope[s]*(SpMatrix[i,s]-Nmax[s]))))/(1+exp(-alpha_slope[s]*(SpMatrix[i,s]-Nmax[s])));
       alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
     }
     
- F_hat[i] = exp(lambda_ei[i] + sum(alpha_function_eij[i,]));
+ F_hat[i] = lambda_ei[i]*exp(sum(alpha_function_eij[i,]));
 
 
   }
@@ -75,7 +76,7 @@ model{
   alpha_initial ~ normal(0,0.1);
   alpha_slope ~ normal(0,0.1);
   lambdas ~ cauchy(0, 10);
-  c ~ normal(0, 1);
+  c ~ normal(0, 0.1);
   disp_dev ~ cauchy(0, 1);  // safer to place prior on disp_dev than on phi
   
 
