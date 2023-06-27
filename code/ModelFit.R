@@ -37,39 +37,39 @@ run = T
 for( scenario in c("low","medium","high")){
 
 # initial conditions for viable seeds in seed bank
-N0 <- c(5000,5000)
-time.exp <- 3 # number of years of data collected
-
+N0 <- c(200,10)
+time.exp.max <- 5 # number of years of data collected
+time.exp.min <- 2
 # number of years to simulate
-nyears <- 20
+nyears <- 30
 params.low <- list(
   mu    = c(0.10, 0.05), # mortality rate of seeds
   nu    = c(0.10, 0.05), # mortality rate of ind
-  alpha_ij = 0.5 , #competitive effect of j on i
-  alpha_ji = 0.1 #competitive effect of i on j
+  alpha_ij = 0.75 , #competitive effect of j on i
+  alpha_ji = 0.40 #competitive effect of i on j
 )
 
 params.medium <- list(
-  mu    = c(0.10, 0.15), # mortality rate of seeds
-  nu    = c(0.10, 0.15), # mortality rate of ind
-  alpha_ij = 0.15 , #competitive effect of j on i
-  alpha_ji = 0.10 #competitive effect of i on j
+  mu    = c(0.10, 0.1), # mortality rate of seeds
+  nu    = c(0.10, 0.1), # mortality rate of ind
+  alpha_ij = 0.40 , #competitive effect of j on i
+  alpha_ji = 0.40 #competitive effect of i on j
 
 )
 params.high <- list(
   mu    = c(0.10, 0.50), # mortality rate of seeds
   nu    = c(0.10, 0.50), # mortality rate of ind
   alpha_ij = 0.05 , #competitive effect of j on i
-  alpha_ji = 0.10 #competitive effect of i on j
+  alpha_ji = 0.40 #competitive effect of i on j
 )
 params <- append(get(paste0("params.",scenario)),
                  list( # constant parameters
                    T     = 0.50,
-                   gamma = c(0.0001, 0.00001), # germination rate of seeds
-                   r     = c(10.00, 10.00), # intrinsic growth rate
-                   K     = c(100.0, 100.0), # carrying capacity
+                   gamma = c(0.1, 0.1), # germination rate of seeds
+                   r     = c(2.00, 2.00), # intrinsic growth rate
+                   K     = c(25.0, 25.0), # carrying capacity
                    beta  = c(0.2, 0.2), # biomass of germinant 
-                   phi   = c(10,10) # conversion rate from biomass to seed
+                   phi   = c(5,5) # conversion rate from biomass to seed
                  ))
 
 params.plant <- params #for plant growth phase
@@ -77,14 +77,15 @@ params.plant <- params #for plant growth phase
 params.seed <- append(get(paste0("params.",scenario)), # for seed growth phase
                       list( # constant parameters
                         T     = 0.50,
-                        gamma = c(0.001, 0.001), # germination rate of seeds
+                        gamma = c(0.7, 0.7), # germination rate of seeds
                         r     = c(0.00, 0.00), # intrinsic growth rate
-                        K     = c(100.0, 100.0), # carrying capacity
+                        K     = c(25.0, 25.0), # carrying capacity
                         beta  = c(0.2, 0.2) # biomass of germinant 
                       ))
 
 #for seed germination phase
 source("code/GenerateSimData_wrapper.R")
+
 #Generate.experimental.outcomes <- read.csv("results/Generate.experimental.outcomes.csv")
 #Generate.simulated.data <- read.csv("results/Generate.simulated.data.csv")
 
@@ -105,7 +106,7 @@ for(Code.focal in c("i","j")){ #,"j"
 # subset for one Code.focal species 
     
 SpDataFocal <- simdata[which(simdata$focal == Code.focal),]
-SpDataFocal <- SpDataFocal[which(SpDataFocal$time <= time.exp),]
+SpDataFocal <- SpDataFocal[which(simulated.data$time>=time.exp.min & simulated.data$time < time.exp.max),]
 
 #SpDataFocal <- simdata
 #SpDataFocal <- SpDataFocal[which(SpDataFocal$focal == Code.focal),]
@@ -180,8 +181,8 @@ print("Final Fit beginning")
 #install.packages("codetools")
 library("codetools")
 options(mc.cores = parallel::detectCores())
-list.init <- function(...)list(lambdas= array(abs(as.numeric(rnorm(1,mean = 5,
-                                                                   sd= 2), dim = 1))))
+list.init <- function(...)list(lambdas= array(abs(as.numeric(rnorm(1,mean = 2,
+                                                                   sd= 1), dim = 1))))
 if(run == T){
 FinalFit <- rstan::stan(file = "code/DensityFunct_BH_Final.stan", 
                   data = DataVec,

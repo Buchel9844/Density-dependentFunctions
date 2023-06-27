@@ -15,6 +15,7 @@ alpha_function4  <- function(Amin, Aslopes,c,N,N0){
   return(alpha)
 }
 library(deSolve)
+alpha_function4(-0.6380506,0.1211577,0.8000038,5,1)
 
 Ricker_function <- function(t,
                             y,
@@ -53,10 +54,10 @@ Ricker_function <- function(t,
   Fi <-  exp(lambda[1] + aii * g[1] * Ni + aij * g[2] * Nj)
   Fj <-  exp(lambda[2] + ajj * g[2] * Nj + aji * g[1] * Ni)
   
-  Ni.diff <- (1-g[1]) * s[1] + g[1] * Fi
-  Nj.diff <- (1-g[2]) * s[2] + g[2] * Fj
+  dNi <- (1-g[1]) * s[1] + g[1] * Fi
+  dNj <- (1-g[2]) * s[2] + g[2] * Fj
   
-  return(list(c(Ni.diff,Nj.diff))) })
+  return(list(c(dNi,dNj))) })
 }
 
 Ricker_solution <- function(gens,

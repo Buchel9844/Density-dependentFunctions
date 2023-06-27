@@ -169,7 +169,8 @@ pdf(paste0("figures/PostFecundity_distribution_",scenario,".pdf"))
       
 load(paste0("results/FinalFit_",scenario,"_",Code.focal,"_function_",function.int,".rds"))
 simdata <- read.csv(paste0("results/Generate.simulated.data.",scenario,".csv"))
-simdata <- simdata[which(simdata$time == time.exp &
+simdata <- simdata[which(simdata$time >= time.exp.min & 
+                           simdata$time < time.exp.max &
                            simdata$focal == Code.focal),]
 
 col2 <- c("black","#CC79A7","#E69F00","#009E73")
@@ -197,6 +198,7 @@ stan_post_pred_check_all(FinalPosteriors,"F_hat",
 #---- 2.0. Compare model for each focal  ----
 # reference : Vehtari, A., Gelman, A., and Gabry, J. (2017). Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC. Statistics and Computing. 27(5), 1413–1432. :10.1007/s11222-016-9696-4. online, arXiv preprint arXiv:1507.04544.
 model.loo <- list()
+for( scenario in c("low","medium","high")){
 for(Code.focal in c("i","j")){ #,"j"
   for (function.int in c(1:4)){ # c(1:4)
     
@@ -213,19 +215,19 @@ log_lik <- loo::extract_log_lik(FinalFit,
 r_eff <- loo::relative_eff(exp(log_lik), cores = 2) 
 # preferably use more than 2 cores (as many cores as possible)
 # will use value of 'mc.cores' option if cores is not specified
-model.loo[[paste0(Code.focal,"_function_",function.int)]] <- loo::loo(log_lik, 
+model.loo[[paste0(scenario,"_",Code.focal,"_function_",function.int)]] <- loo::loo(log_lik, 
                                                                r_eff = r_eff, cores = 2)
 remove(FinalFit)
-
+    }
   }
 }
 Se_loo_model <- NULL
 for( scenario in c("low","medium","high")){
 for(Code.focal in c("i","j")){ #,"j"
-comp <- loo_compare(model.loo[[paste0(Code.focal,"_","function_1")]], 
-                    model.loo[[paste0(Code.focal,"_","function_2")]],
-                    model.loo[[paste0(Code.focal,"_","function_3")]],
-                    model.loo[[paste0(Code.focal,"_","function_4")]])
+comp <- loo_compare(model.loo[[paste0(scenario,"_",Code.focal,"_","function_1")]], 
+                    model.loo[[paste0(scenario,"_",Code.focal,"_","function_2")]],
+                    model.loo[[paste0(scenario,"_",Code.focal,"_","function_3")]],
+                    model.loo[[paste0(scenario,"_",Code.focal,"_","function_4")]])
 model.loo[[Code.focal]] <- comp # The first column shows the difference in ELPD relative to the model with the largest ELPD.
 
   df_loo <- data.frame(se_diff = model.loo[[Code.focal]][,"se_diff"]) %>%

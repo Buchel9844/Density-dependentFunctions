@@ -4,16 +4,15 @@ library(deSolve)
 
 #----extract parameters for each function and each scenario----
 params.low <- list(
-  g = c(0.001, 0.001), # germination rate of seeds
+  g = c(0.7, 0.7), # germination rate of seeds
   s    = c(0.9, 0.95) # 1 - mortality rate of seeds
 )
-
 params.medium <- list(
-  g = c(0.001, 0.001), # germination rate of seeds
-  s    = c(0.90, 0.85) # mortality rate of seeds
+  g = c(0.7, 0.7), # germination rate of seeds
+  s    = c(0.90, 9) # mortality rate of seeds
 )
 params.high <- list(
-  g = c(0.001, 0.001), # germination rate of seeds
+  g = c(0.7, 0.7), # germination rate of seeds
   s    = c(0.90, 0.50) # mortality rate of seeds
 )
 
@@ -43,10 +42,11 @@ for( scenario in c("low","medium","high")){
   
       
       simdata <- read.csv(paste0("results/Generate.simulated.data.",scenario,".csv"))
-      simdata <- simdata[which(simdata$time <= time.exp &
+      simdata <- simdata[which(simdata$time >= time.exp.min & 
+                                 simdata$time < time.exp.max &
                                  simdata$focal == Code.focal),]
-      Nmax[int.focal,1] <- 0 #simdata[which.max(simdata$fecundity),"plants.i"]
-      Nmax[int.focal,2] <- 0 #simdata[which.max(simdata$fecundity),"plants.j"]
+      Nmax[int.focal,1] <- simdata[which.max(simdata$fecundity),"plants.i"]
+      Nmax[int.focal,2] <- simdata[which.max(simdata$fecundity),"plants.j"]
       
       
       remove(FinalFit )
@@ -68,14 +68,25 @@ for( scenario in c("low","medium","high")){
    }
 }
 state.list <- list()
+population.dynamics.all <- data.frame()
 for( scenario in c("low","medium","high")){
 population.dynamics <- read.csv(paste0("results/Generate.population.dynamics.",scenario,".csv"))
+population.dynamics$scenario <- scenario
+
 # initial species densities
-state <- c(population.dynamics[which(population.dynamics$Time == 3),"Seeds.i"][1],
-           population.dynamics[which(population.dynamics$Time == 3),"Seeds.j"][1]) 
+state <- c(population.dynamics[which(population.dynamics$Time == time.exp.max),"Seeds.i"][1],
+           population.dynamics[which(population.dynamics$Time == time.exp.max),"Seeds.j"][1]) 
 
 state.list[[scenario]] <- state
+population.dynamics.all  <- bind_rows(population.dynamics.all ,population.dynamics)
 }
+population.dynamics.all <- pivot_longer(population.dynamics.all , 
+                              cols=c("Seeds.i","Seeds.j"), 
+                              names_to="Population", values_to="N") %>%
+  mutate(Population = case_when(Population =="Seeds.i" ~"Ni" ,
+                                Population =="Seeds.j" ~"Nj" ))
+
+
 
 #---- for high scenario ----
 source("code/PopProjection_toolbox.R")
@@ -86,23 +97,37 @@ for( scenario in c("low","medium","high")){
     df <- NULL
 p <- list.pars[[paste0("pars_",scenario,"_function_",function.int)]] 
 y <- state.list[[scenario]]  # initial species densities
-gens= 20
+gens = 25
 
-df <- Ricker_solution(gens= 20,
-                state=state,
-                pars=pars)
+df <- Ricker_solution(gens= gens,
+                state=y,
+                pars=p)
 df$scenario <- scenario
 df$function.int <- function.int
 df.pop.proj <- bind_rows(df.pop.proj,df)
   }
 }
 
+
 df.pop.proj.l <- pivot_longer(df.pop.proj , cols=2:3, names_to="Population", values_to="N")
-ggplot(aes(t, N, colour=Population), data=df.pop.proj.l) + geom_line() +
-  facet_grid(function.int ~scenario, scale="free")
+df.pop.proj.l <- df.pop.proj.l %>% arrange(factor(scenario, 
+                                                  levels = c("low","medium","high")))
+
+ggplot() + geom_line(data=df.pop.proj.l,aes(x=t, y=N, colour=Population)) +
+  geom_point(data=df.pop.proj.l,aes(x=t, y=N, colour=Population)) +
+  facet_grid(scenario~function.int, scale="free") + 
+  geom_line(data=population.dynamics.all,
+            aes(x=Time-time.exp.max, y=N, colour=Population),
+            alpha=0.5) +
+  theme_bw() +scale_y_log10(limits=c(1e-6,1e6)) +
+  scale_color_manual(values=c("black","red")) +
+  
+  labs(title = "Projection of seed trajectory for species i (native) and j (competitor)",
+       x="Generations", y="Density of viable seeds")
 
 
-years = seq(0, 20, by = 1)
+#---- Try with ODE -----
+years = seq(0, 100, by = 0.01)
 
 df.NiNj <- ode(y = y, times = years, 
                              func = Ricker_function, parms = p,
@@ -122,4 +147,6 @@ df.NiNj$function.int <- function.int
 df.NiNj$scenario <- scenario
 
 df.pop.proj <- bind_rows(df.pop.proj, df.NiNj)
+
+
 

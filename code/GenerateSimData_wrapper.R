@@ -22,7 +22,7 @@ source("code/GenerateContinuousData-Stouffer.R")
 
 
 ggsave(paste0("figures/simulated.seed.density.",scenario,".pdf"),
-       plot = ggplot(simulated.data[which(simulated.data$time<= time.exp),],
+       plot = ggplot(simulated.data[which(simulated.data$time>=time.exp.min & simulated.data$time < time.exp.max),],
                      aes(x=fecundity,
                          group=focal)) + 
          geom_density(alpha=0.6) +
@@ -44,7 +44,7 @@ ggsave(paste0("figures/simulated.seed.biomass.",scenario,".pdf"),
 
 
 ggsave(paste0("figures/simulated.seed.biomass.",scenario,".pdf"),
-       plot = ggplot(data = gather(simulated.data[which(simulated.data$time <= time.exp),],
+       plot = ggplot(data = gather(simulated.data[which( simulated.data$time>=time.exp.min & simulated.data$time < time.exp.max),],
                            plants.i,plants.j,key="plants",value="n.ind"),
                     aes(y=fecundity, x=time, color=n.ind)) +
                       geom_point(aes(shape=focal),size=3,position="jitter")+ theme_bw() +

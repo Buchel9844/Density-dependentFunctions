@@ -17,7 +17,7 @@ data{
 }
 
 parameters{
-  vector<lower=0,upper=10>[1] lambdas; // intrinsic growth rate - always positive
+  vector<lower=0,upper=5>[1] lambdas; // intrinsic growth rate - always positive
   vector<lower=0,upper =1>[S] c; //slope of the inflation point - specific distribution - always positive
 
   vector<lower=-1,upper =1>[S] alpha_initial; // initial effect of j on i - when Nj is minimal
@@ -64,7 +64,7 @@ transformed parameters{
       }
     }
     
- F_hat[i] = lambda_ei[i]*exp(sum(alpha_function_eij[i,]));
+ F_hat[i] = exp(lambda_ei[i] + sum(alpha_function_eij[i,]));
 
 
   }
@@ -73,10 +73,10 @@ transformed parameters{
 
 model{
   // set regular priors
-  alpha_initial ~ normal(0,0.1);
-  alpha_slope ~ normal(0,0.1);
-  lambdas ~ cauchy(0, 10);
-  c ~ normal(0, 0.1);
+  alpha_initial ~ normal(0,1);
+  alpha_slope ~ normal(0,1);
+  lambdas ~ normal(0,1);
+  c ~ normal(0, 1);
   disp_dev ~ cauchy(0, 1);  // safer to place prior on disp_dev than on phi
   
 
