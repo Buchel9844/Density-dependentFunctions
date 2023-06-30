@@ -85,7 +85,8 @@ population.dynamics.all <- pivot_longer(population.dynamics.all ,
                               names_to="Population", values_to="N") %>%
   mutate(Population = case_when(Population =="Seeds.i" ~"Ni" ,
                                 Population =="Seeds.j" ~"Nj" ))
-
+write.csv(population.dynamics.all, 
+          "results/population.dynamics.all.csv")
 
 
 #---- for high scenario ----
@@ -109,9 +110,12 @@ df.pop.proj <- bind_rows(df.pop.proj,df)
 }
 
 
+
 df.pop.proj.l <- pivot_longer(df.pop.proj , cols=2:3, names_to="Population", values_to="N")
 df.pop.proj.l <- df.pop.proj.l %>% arrange(factor(scenario, 
                                                   levels = c("low","medium","high")))
+write.csv(df.pop.proj.l, 
+          "results/PopProjection.csv")
 
 ggplot() + geom_line(data=df.pop.proj.l,aes(x=t, y=N, colour=Population)) +
   geom_point(data=df.pop.proj.l,aes(x=t, y=N, colour=Population)) +

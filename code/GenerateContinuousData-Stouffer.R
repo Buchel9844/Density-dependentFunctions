@@ -102,7 +102,7 @@ write.csv(population.dynamics ,
 ###################################################
 # plot two-species population-dynamics time series 
 ###################################################
-pdf(paste0("figures/simulated.com.dynamics.",scenario,".pdf"))
+#pdf(paste0("figures/simulated.com.dynamics.",scenario,".pdf"))
 #dev.new(width=16,height=7)
 par(oma=c(0,0,0,0), mar=c(4.5,5,4,2))
 layout(mat = matrix(
@@ -189,4 +189,4 @@ plot(
   ylab=expression("Plant biomass ("*italic(B[j])*")"),
   xlim=c(0,nyears)
 )
-dev.off()
+#dev.off()

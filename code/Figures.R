@@ -6,7 +6,7 @@ library(tidyverse)
 ##########################################################################################################
 # 1. Simulation data
 ##########################################################################################################
-#---- 0. check models 
+#---- 0. check models ----
 ModelCheck <- NULL
 for( scenario in c("low","medium","high")){
   for(Code.focal in c("i","j")){ #,"j"
@@ -244,7 +244,8 @@ list.name <- paste0("model.loo.",scenario)
 save(list.name,
      file = paste0("results/model.loo.",scenario,".RData"))
 }
-
+write.csv(Se_loo_model,
+          paste0("results/Se_loo_model.csv"))
 
 
 ##########################################################################################################

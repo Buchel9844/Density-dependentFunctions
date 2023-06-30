@@ -1,13 +1,22 @@
 alpha_function2 <- function(Amin, Aslopes,N,N0){
   alpha = Amin + Aslopes*(N-N0)
+  if((N-N0) >10 ){
+    alpha = Amin + Aslopes*(10)
+  }
   return(alpha)
 }
 alpha_function3 <- function(Amin, Aslopes,c,N,N0){
   alpha = Amin + Aslopes*(1-exp(-c*(N-N0)))
+  if((N-N0) >10 ){
+    alpha = Amin + Aslopes*(1-exp(-c*(10)))
+  }
   return(alpha)
 }
 alpha_function4  <- function(Amin, Aslopes,c,N,N0){
   e = exp(-Aslopes*(N-N0)) # c is stretching the graph horizontally 
+  if((N-N0) >10 ){
+    e = exp(-Aslopes*(10))
+  }
   a = c*(1-e) #stretching the graph vertically
   d = Amin
   alpha = (a/(1 + e)) + d
@@ -105,7 +114,7 @@ Ricker_solution <- function(gens,
     ajj <- alpha_function4(a_initial[2,2], a_slope[2,2],c[2,2],g[2]*Nj, Nmax[2])
   }
 
-
+  
   Fi <-  exp(lambda[1] + aii * g[1]*Ni + aij *g[2]*Nj)
   Fj <-  exp(lambda[2] + ajj * g[2]*Nj + aji *g[1]*Ni)
   

@@ -121,14 +121,19 @@ ui <- fluidPage(
 
 # Define server logic required to draw a histogram
 server <- function(input, output) {
-  
+  alpha_function2 <- function(Amin, Aslopes,N,N0){
+    alpha = Amin + Aslopes*(N-N0)
+    if( all((N-N0) > 10 )){
+      alpha = Amin + Aslopes*(10)
+    }
+    return(alpha)
+  }
   half.signoidal.function <- function(Amin, Aslopes,c ,N,N0){
     #alpha = Amin - (exp(Aslopes*N)/(1 + abs(exp(Aslopes*N - c))))
     #alpha = Amin/(1 + exp(-Aslopes*(N)))
     #alpha = log(Aslopes*N + 1) + Amin - c
     alpha = Amin+Aslopes*(1-exp(-c*(N-N0)))
     #alpha = sqrt(Aslopes*N + Amin)
-    
     return(alpha)
   }
   signoidal.function <- function(Amin, Aslopes, c ,N,N0){
@@ -159,21 +164,21 @@ server <- function(input, output) {
         values = c("limegreen")) }
     
     
-    f2 <- ggplot(data.frame(N= N, alpha = (Amin + Aslopes*(N-N0))), 
-                 aes(y=alpha, x= N))+
+    f2 <- ggplot(data.frame(N= N - N0, alpha = alpha_function2(Amin,Aslopes,N,N0)), 
+                 aes(y=alpha, x= N)) +
       geom_line(aes(colour = after_stat(y < 0)))+     
       guides(color="none") + labs(title="function 2") + 
       geom_hline(yintercept=0,linetype="dashed") +
       xlab("Neighbour density of j") + ylab("Resulting effect of j on i")+
       theme_bw() +
-      if(all((Amin + Aslopes*N) < 0)){
+      if(all(alpha_function2(Amin, Aslopes,N,N0) < 0)){
         scale_colour_manual(
           values = c("red")) 
       }else{scale_colour_manual(
         values = c("limegreen","red")) }
     
     
-    f3 <- ggplot(data.frame(N= N, alpha =  half.signoidal.function(Amin, Aslopes,c ,N,N0)), 
+    f3 <- ggplot(data.frame(N= N - N0, alpha =  half.signoidal.function(Amin, Aslopes,c ,N,N0)), 
                  aes(y=alpha, x= N))+
       #geom_smooth(alpha=0.8,color="grey") +
       labs(title="function 3") + 
@@ -182,13 +187,13 @@ server <- function(input, output) {
       guides(color="none") +
       xlab("Neighbour density of j") + ylab("Resulting effect of j on i")+
       theme_bw()+
-      if(all( half.signoidal.function(Amin, Aslopes,c ,N,N0) < 0)){
+      if(all( half.signoidal.function(Amin, Aslopes,c,N,N0) < 0)){
         scale_colour_manual(
           values = c("red")) 
       }else{scale_colour_manual(
         values = c("limegreen","red")) }
     
-    f4 <- ggplot(data.frame(N= N, alpha = signoidal.function(Amin, Aslopes,c ,N,N0)), 
+    f4 <- ggplot(data.frame(N= N - N0, alpha = signoidal.function(Amin, Aslopes,c ,N,N0)), 
                  aes(y=alpha, x= N))+
       #geom_smooth(alpha=0.8,color="grey") + 
       labs(title="function 4") + 
@@ -216,7 +221,7 @@ server <- function(input, output) {
     }
     if(function.alpha == 2){
       aii <- 0.2 + 0.2*(Ni-Ni0)
-      aij <- Amin + Aslopes*(Nj-Nj0)
+      aij <- alpha_function2(Amin, Aslopes ,Nj,Nj0)
     }
     if(function.alpha == 3){
       aii <- half.signoidal.function(-0.2, -0.2,c ,Ni,N0 =Ni0)
