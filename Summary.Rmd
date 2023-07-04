@@ -26,15 +26,15 @@ library(tinytex)
 library(purrr)
 ```
 
-# Species interactions as density-denpendent function
+# Species interactions as density-denpendent functions
 ## Motivation
 Species interactions are traditionally set to a constant per capita effect of the addition of one neighbour on the fecundity of the focal species. To set them as a constant remove the potential of the interactive effect to change from facilitation (positive) to competition (negative) when the density of the neighbour increases.
 If we set species interactions to density-dependent functions for a two-species community, we hypothesized that the projected community trajectory would have a better match to observation/reality. 
 
-## Theorethical functions
+## Theoretical functions
 
-### Equations of the theorethical functions
-Four functions dependent on neighbours density were built: 
+### Equations of the theoretical functions
+Four functions dependent on neighbours' density were built: (original code shiny/functions.R)
 + (1) constant interaction
 $$\alpha_{ij} = \alpha_{0,i,j}$$
 + (2) linear interaction
@@ -43,17 +43,17 @@ $$\alpha_{ij} = \alpha_{0,i,j} + \alpha_{1,i,j}*g_j*(N_j - N_{j,0})$$
 $$\alpha_{ij} = \alpha_{0,i,j} + \alpha_{1,i,j}*(1-e^{-c_i*g_j*(N_j - N_{j,0}})$$
 + (4) sigmoidal interaction
 $$\alpha_{ij} = \alpha_{0,i,j} + \frac{c_i*(1-e^{-\alpha_{1,i,j}*g_j*(N_j - N_{j,0})})}{1+e^{-\alpha_{1,i,j}*g_j*(N_j - N_{j,0})}}$$
-$N_0$ is the density of species $j$ when the focal $i$ has its highest fecundity observed ($[0,R^+]$); $g_j$ is the germination rate of species $j$; $N_j$ is the viable seed density of species $j$ ($[0,R^+]$); $g_j*N_j$ is the observed density of germinated species $j$; $g_j*N_{0,j}$ is the density species $j$ when species $i$ reached its maximum observed fecundity; $\alpha_{0,i,j}$ is the minimal effect of $j$ on $i$ when $N_j-N_0$ is equal to 0 ($[-1,-1]$); $\alpha_{1,i,j}$ is the effect of the addition of one unit of $j$ ($[-1,-1]$); $c_{i}$ is a stretching coefficient ($[0,1]$).The reciprocal function can be established for $\alpha_ii$. Noted that we use the difference of observed density $g_j*N_j$ and optimal density $g_j*N_{0,j}$ to infer that species $i$ do not have to reach maximum fitness when growing alone.  To avoid the coefficeint to become extremely large, the follwoing condition was set for the 3 last functions: 
-if $g_j*(N_j - N_{0,j}) > 10$, $\alpha_{i,j}$ is set has the value when $g_j*(N_j - N_{0,j}) = 10$
+$N_0$ is the density of species $j$ when the focal $i$ has its highest fecundity observed ($[0,R^+]$); $g_j$ is the germination rate of species $j$; $N_j$ is the viable seed density of species $j$ ($[0,R^+]$); $g_j*N_j$ is the observed density of germinated species $j$; $g_j*N_{0,j}$ is the density species $j$ when species $i$ reached its maximum observed fecundity; $\alpha_{0,i,j}$ is the minimal effect of $j$ on $i$ when $N_j-N_0$ is equal to 0 ($[-1,-1]$); $\alpha_{1,i,j}$ is the effect of the addition of one unit of $j$ ($[-1,-1]$); $c_{i}$ is a stretching coefficient ($[0,1]$).The reciprocal function can be established for $\alpha_ii$. Note that we use the difference of observed density $g_j*N_j$ and optimal density $g_j*N_{0,j}$ to infer that species $i$ do not have to reach maximum fitness when growing alone. To avoid the coefficient to become extremely large, the following condition was set for the 3 last functions: 
+if $g_j*(N_j - N_{0,j}) > 10$, $\alpha_{i,j}$ is set has the value when $g_j*(N_j - N_{0,j}) = 10$.
 
-The interaction effects are implemented into a density dependent fecundity model knows at the Ricker model of the following form: 
+The interaction effects are implemented into a density-dependent fecundity model known as the Ricker model of the following form: 
 $$F_i = \lambda_i e^{\alpha_ii N_i + \alpha_ij N_j}$$
 with $\lambda_i$ the intrinsic fecundity of focal $i$. 
-Please see the annexed Shiny-app to play with the 4 functions and visualized their matching fecundity distribution. 
+Please see the annexed Shiny App to play with the 4 functions and visualize their matching fecundity distribution. 
 
 
-### Test functions on an artifical community
-To verify that the function can correctly retrieve interaction effects, we simulated a community with the Ricker model (above), with specific interaction effects. The two species have the following fecundity distribution: 
+### Test functions on an artificial community
+To verify that the function can correctly retrieve interaction effects, we effectuated a preliminary analysis: we extracted surface-response experimental dataset from a 2-species community following the Ricker model (above), with specific interaction effects traditionally quantified as constant (function 1). A surface-response experimental dataset gather observations of how the fecundity of the focal species (i or j) varies along a gradient of the density of species i and species j in the local neighbourhood of a focal individual. The two species have the following fecundity distribution: (original code GenerateSimDate_Ricker.R)
 ```{r Ricker distributions, echo=FALSE, , include=FALSE}
 source("/Users/lisabuche/Documents/Projects/Density-dependentFunctions/code/GenerateSimData_Ricker.R",local = knitr::knit_global()) 
 set.seed(16)
@@ -68,7 +68,7 @@ ggplot(simdata, aes(x=seeds, color=as.factor(focal))) +
          scale_x_continuous(name = "Viable seed, fecundity per individuals (log transformed)", limits=c(0,200)) + 
          theme_bw() 
 ```
-The community was fit in Bayesian model with the following prior: $\lambda_i \sim  N(0,1^+)$, $\alpha_{0,i,j} \sim N(-1,1)$, $\alpha_{1,i,j} \sim N(-1,1)$, and $c_i \sim N(-1,1)$. Parameters were estimated following a negative binomial (Rstan neg_binomial_2). Here are the estimated interaction effect for each function, compared to the initial value set, in blue.
+The surface-response experimental dataset was fit in a Bayesian model of the same Ricker model, with the interaction effects described by each of the four density-dependent functions. Priors were set as follow: $\lambda_i \sim  N(0,1^+)$, $\alpha_{0,i,j} \sim N(-1,1)$, $\alpha_{1,i,j} \sim N(-1,1)$, and $c_i \sim N(-1,1)$. Parameters were estimated following a negative binomial (Rstan neg_binomial_2). Here are the estimated interaction effects for each function, compared to the initial value set, in blue. (original code ModelFit_Ricker.R)
 
 
 ```{r Ricker alpha, echo=FALSE}
@@ -114,8 +114,7 @@ ggplot() +
 # Example on 3 Competitive communities
 
 ## Three competitive scenarios
-
-For the three community, one species $j$ invade a species $i$, below are the common and specific parameters for each scenario. Parameters are always order by c(i,j). The parameters are fit in Stouffer,2023 - MethEcoEvo model. Scripts have been modified from Stouffer original scripts. The graphs below shows the population dynamics for the first scenario (untitled "low"). 
+First, we simulated three 2-species communities following different dynamics of competition. For the three communities, one species $j$ invade a species $i$; below are the common and specific parameters for each scenario. Parameters are always ordered by c(i,j). The parameters describe the population model of Stouffer,2023 - MethEcoEvo model. Scripts have been modified from Stouffer original scripts. Based on these parameters, we can simulate the surface-response experimental dataset for 3 years (from second to fifth growing seasons) and population dynamics over 30 years respectively for each scenario. The graphs below show the population dynamics for the first scenario (untitled "low"). (original code ModelFit.R and GenerateSimDate_wrapper.R)
 
 ```{r common par, echo=TRUE}
 # initial conditions for viable seeds in seed bank
@@ -175,7 +174,7 @@ source("/Users/lisabuche/Documents/Projects/Density-dependentFunctions/code/Gene
 
 ## Bayesian approach
 
-For each scenario, we fitted the same Bayesian approach than above, with the same priors. Minimal conditions of convergence for bayesian models are a Rhat < 1.1 and a Neff > 100. 
+For each scenario, we fitted the surface-response dataset to the Bayesian model of the Ricker model, with the interaction effects described by each of the four density-dependent functions, with the same priors as above. Minimal convergence conditions for Bayesian models are a Rhat < 1.1 and a Neff > 100. ("function 3 - high" converges when rerun - not updated yet). (original code Figures.R)
 ```{r bayes cdt, echo=FALSE}
 ModelCheck <- NULL
 for( scenario in c("low","medium","high")){
@@ -197,7 +196,7 @@ for( scenario in c("low","medium","high")){
   ModelCheck
 ```
 
-To evaluate which density dependent functions fits best each focal species for each scenario, we look at the loglikelihood with the loo package. 
+To evaluate which density-dependent functions fit best each focal species for each scenario, we look at the loglikelihood with the loo package. The graphs below show the fecundity distribution for each focal species (row 1 = species i, in blue; row 2 = species j, in red), for each density-dependent functions (1 to 4, from left to right).That is, there are 3 figures (one figure per scenario) and with 8 panels each. Each panel shows the posterior distributions of the fecundity distribution evaluated by the Bayesian model and compares it to the fecundity observations. (original code Figures.R)
 
 ```{r mage-bayes-models, echo=FALSE}
 source("/Users/lisabuche/Documents/Projects/Density-dependentFunctions/code/stan_modelcheck_rem.R", local = knitr::knit_global())
@@ -235,7 +234,7 @@ value.se <- round(Se_loo_model$se_diff[which(Se_loo_model$model == function.int 
 FinalPosteriors <- rstan::extract(FinalFit)
 stan_post_pred_check_all(FinalPosteriors,"F_hat",
                      simdata$fecundity[!is.na(simdata$fecundity)],
-                     paste0(scenario,"for species ",Code.focal,",function ",function.int),
+                     paste0(scenario,"for species ","\n",Code.focal,",function ",function.int),
                      col1[int.focal],
                      col2[function.int ],
                      value.se) 
@@ -246,8 +245,9 @@ stan_post_pred_check_all(FinalPosteriors,"F_hat",
 }
 ```
 
-The approach estimates interaction effects.\
-Low scenario - parameters set species $j$ has the superior competitor:
+The approach estimates interaction effects. Each scenario has one figure with 4 panels. The row designated the focal species identity and the columns the identity of the individuals in the neighbourhood. The y-axis is the resulting effect on the focal's fecundity. The x-axis is the density of neighbours, note that it designates the difference between the observed density and the optimal density of neighbours : $N_J - N_{0,j}$. Please see "the equations of the theoretical functions" section for further explanation. 
+
+Low scenario - parameters set species $j$ has the superior competitor:(original code Figures.R)
 
 ```{r mage-bayes-alpha-low, out.width = "95%", fig.cap = "caption", echo = FALSE,fig.pos = "H"}
 knitr::include_graphics(path = "/Users/lisabuche/Documents/Projects/Density-dependentFunctions/figures/AlphadistributionGraphlow.pdf")
@@ -267,20 +267,21 @@ knitr::include_graphics(path = "/Users/lisabuche/Documents/Projects/Density-depe
 
 # Population projection
 
-We can evaluate which density dependent functions has the best projection compared to the observed community projection. The population projections are not great, which I am working on to understand why.  
+We can evaluate which density-dependent functions has the best projection compared to the observed community projection. The population projections are not great, which I am working on to understand why. (original code PopProjection.R and PopProjection_toolbox.R)
 
 ```{r projection population, echo=FALSE}
 
 df.pop.proj.l <- read.csv("results/PopProjection.csv")
 population.dynamics.all <- read.csv("results/population.dynamics.all.csv")
 
-ggplot() + geom_line(data=df.pop.proj.l,aes(x=t, y=N, colour=Population)) +
-  geom_point(data=df.pop.proj.l,aes(x=t, y=N, colour=Population)) +
-  facet_grid(scenario~function.int, scale="free") + 
+
+ggplot() + geom_line(data=df.pop.proj.l,aes(x=t, y=log10(N), colour=Population)) +
+  geom_point(data=df.pop.proj.l,aes(x=t, y=log10(N), colour=Population)) +
+  facet_grid(scenario~function.int, scale="free")+
   geom_line(data=population.dynamics.all,
-            aes(x=Time-time.exp.max, y=N, colour=Population),
+            aes(x=Time-time.exp.max, y=log10(N), colour=Population),
             alpha=0.5) +
-  theme_bw() +scale_y_log10(limits=c(1e-6,1e6)) +
+  theme_bw() +
   scale_color_manual(values=c("black","red")) +
   
   labs(title = "Projection of seed trajectory for species i (native) and j (competitor)",

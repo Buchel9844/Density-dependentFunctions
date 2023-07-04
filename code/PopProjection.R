@@ -117,18 +117,17 @@ df.pop.proj.l <- df.pop.proj.l %>% arrange(factor(scenario,
 write.csv(df.pop.proj.l, 
           "results/PopProjection.csv")
 
-ggplot() + geom_line(data=df.pop.proj.l,aes(x=t, y=N, colour=Population)) +
-  geom_point(data=df.pop.proj.l,aes(x=t, y=N, colour=Population)) +
-  facet_grid(scenario~function.int, scale="free") + 
+ggplot() + geom_line(data=df.pop.proj.l,aes(x=t, y=log10(N), colour=Population)) +
+  geom_point(data=df.pop.proj.l,aes(x=t, y=log10(N), colour=Population)) +
+  facet_grid(scenario~function.int, scale="free")+
   geom_line(data=population.dynamics.all,
-            aes(x=Time-time.exp.max, y=N, colour=Population),
+            aes(x=Time-time.exp.max, y=log10(N), colour=Population),
             alpha=0.5) +
-  theme_bw() +scale_y_log10(limits=c(1e-6,1e6)) +
+  theme_bw() +
   scale_color_manual(values=c("black","red")) +
   
   labs(title = "Projection of seed trajectory for species i (native) and j (competitor)",
        x="Generations", y="Density of viable seeds")
-
 
 #---- Try with ODE -----
 years = seq(0, 100, by = 0.01)
