@@ -78,10 +78,12 @@ nreps <- 10
 
 # data frame for model inputs and outputs
 experimental.design <- data.frame(
-  focal = c(rep("i",10), rep("j", 10)),
-  starting.plants.i =round(abs(rnorm(10*nreps, mean = 4, sd = 5))), #c(3, 2, 1, 1, 1, 2, 1, 0, 0, 0),#round(abs(rnorm(10, mean = 0, sd = 3))), #BucheL change from a set vector
-  starting.plants.j = round(abs(rnorm(10*nreps, mean = 4, sd = 5))), #c(3, 2, 1, 1, 1, 2, 1, 0, 0, 0),#round(abs(rnorm(10, mean = 0, sd = 3))), #BucheL change from a set vector
-  time = rep(c(1:10),nreps),
+  focal = c(rep("i",5), rep("j", 5)),
+  starting.plants.i =round(abs(rnorm(10, mean = 3, sd = 5))), #c(3, 2, 1, 1, 1, 2, 1, 0, 0, 0),#round(abs(rnorm(10, mean = 0, sd = 3))), #BucheL change from a set vector
+  starting.plants.j = round(abs(rnorm(10, mean = 3, sd = 5))), #c(3, 2, 1, 1, 1, 2, 1, 0, 0, 0),#round(abs(rnorm(10, mean = 0, sd = 3))), #BucheL change from a set vector
+  time = c(1:10), #rep(c(1:10),nreps),
+
+  time = rep(1:10),
   stringsAsFactors = FALSE
 )
 

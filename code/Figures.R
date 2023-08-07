@@ -112,45 +112,59 @@ ggsave(paste0("figures/AlphadistributionGraph",scenario,".pdf"),
 
 }
 
-
-#---- 1.2. Figure of fecundity estimation distribution ----
+#---- 1.2. Compare model for each focal  ----
+# reference : Vehtari, A., Gelman, A., and Gabry, J. (2017). Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC. Statistics and Computing. 27(5), 1413–1432. :10.1007/s11222-016-9696-4. online, arXiv preprint arXiv:1507.04544.
+model.loo <- list()
 for( scenario in c("low","medium","high")){
-  
-load( paste0("results/Fecunditydistribution.",scenario,".csv.gz"))
-
-load( paste0("results/PostFecunditydistribution.",scenario,".csv.gz"))
-
-simdata <- read.csv(paste0("results/Generate.simulated.data.",scenario,".csv"))
-simdata <- simdata[which(simdata$time <= time.exp),]
-
-Fecunditydistribution.n <- data.frame(seed=simdata$fecundity,
-                                    focal=simdata$focal,
-                                    obervation= NA )
-
-Post_Fecunditydistribution <- PostFecunditydistribution %>%
-  filter(!is.na(Fec))
-
-PostFecundityGraph <- ggplot(PostFecunditydistribution) +
-  geom_density(aes(x=Fec,
-                  group= obs,
-                  color=as.factor(alpha.function)),
-               alpha=0.2) +
-  geom_density(data = Fecunditydistribution.n , aes(x=seed, 
-                                          color=as.factor(focal)),
-               alpha=0.5) +
-  facet_wrap(focal ~  alpha.function, nrow=2, scales = "free" ) +
-  scale_x_continuous(limits = function(x) {x + c(-10, 10)}) +
-  labs(title = paste0(" Fecundity distributions for predictions compared to initial data for ",scenario), y ="Density",
-       x="Fecundity") +  theme_bw() + guides(color="none") + 
-  scale_color_manual(values=c("black","#CC79A7","#E69F00","#009E73",
-                              "blue","red"))
-
-ggsave(paste0("figures/PostFecundityGraph",scenario,".pdf"),
-       plot = PostFecundityGraph)
-remove(PostFecunditydistribution)
-remove(simdata)
+  for(Code.focal in c("i","j")){ #,"j"
+    for (function.int in c(1:4)){ # c(1:4)
+      
+      load(paste0("results/FinalFit_",scenario,"_",Code.focal,"_function_",function.int,".rds"))
+      # Extract pointwise log-likelihood
+      # using merge_chains=FALSE returns an array, which is easier to 
+      # use with relative_eff()
+      log_lik <- loo::extract_log_lik(FinalFit, 
+                                      parameter_name = "F_sim", 
+                                      merge_chains = F)
+      #as of loo v2.0.0 we can optionally provide relative effective sample sizes
+      # when calling loo, which allows for better estimates of the PSIS effective
+      # sample sizes and Monte Carlo error
+      r_eff <- loo::relative_eff(exp(log_lik), cores = 2) 
+      # preferably use more than 2 cores (as many cores as possible)
+      # will use value of 'mc.cores' option if cores is not specified
+      model.loo[[paste0(scenario,"_",Code.focal,"_function_",function.int)]] <- loo::loo(log_lik, 
+                                                                                         r_eff = r_eff, cores = 2)
+      remove(FinalFit)
+    }
+  }
 }
-#---- 1.2.bis. Figure of fecundity estimation distribution ----
+Se_loo_model <- NULL
+for( scenario in c("low","medium","high")){
+  for(Code.focal in c("i","j")){ #,"j"
+    comp <- loo_compare(model.loo[[paste0(scenario,"_",Code.focal,"_","function_1")]], 
+                        model.loo[[paste0(scenario,"_",Code.focal,"_","function_2")]],
+                        model.loo[[paste0(scenario,"_",Code.focal,"_","function_3")]],
+                        model.loo[[paste0(scenario,"_",Code.focal,"_","function_4")]])
+    model.loo[[Code.focal]] <- comp # The first column shows the difference in ELPD relative to the model with the largest ELPD.
+    
+    df_loo <- data.frame(se_diff = model.loo[[Code.focal]][,"se_diff"]) %>%
+      rownames_to_column(var = "model") %>%
+      mutate(model = stringi::stri_sub(model,from =6,to=6),
+             scenario = scenario,
+             focal = Code.focal)
+    
+    Se_loo_model <- bind_rows(Se_loo_model, df_loo)
+  }
+  assign(paste0("model.loo.",scenario),
+         model.loo)
+  list.name <- paste0("model.loo.",scenario)
+  save(list.name,
+       file = paste0("results/model.loo.",scenario,".RData"))
+}
+write.csv(Se_loo_model,
+          paste0("results/Se_loo_model.csv"))
+
+#---- 1.3. Figure of fecundity estimation distribution ----
 for( scenario in c("low","medium","high")){
 pdf(paste0("figures/PostFecundity_distribution_",scenario,".pdf")) 
   par(oma=c(0,0,0,0), mar=c(2.25,2.5,2,1))
@@ -195,57 +209,6 @@ stan_post_pred_check_all(FinalPosteriors,"F_hat",
 }
   
   
-#---- 2.0. Compare model for each focal  ----
-# reference : Vehtari, A., Gelman, A., and Gabry, J. (2017). Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC. Statistics and Computing. 27(5), 1413–1432. :10.1007/s11222-016-9696-4. online, arXiv preprint arXiv:1507.04544.
-model.loo <- list()
-for( scenario in c("low","medium","high")){
-for(Code.focal in c("i","j")){ #,"j"
-  for (function.int in c(1:4)){ # c(1:4)
-    
-load(paste0("results/FinalFit_",scenario,"_",Code.focal,"_function_",function.int,".rds"))
-    # Extract pointwise log-likelihood
-    # using merge_chains=FALSE returns an array, which is easier to 
-    # use with relative_eff()
-log_lik <- loo::extract_log_lik(FinalFit, 
-                                  parameter_name = "F_sim", 
-                                  merge_chains = F)
-#as of loo v2.0.0 we can optionally provide relative effective sample sizes
-# when calling loo, which allows for better estimates of the PSIS effective
-# sample sizes and Monte Carlo error
-r_eff <- loo::relative_eff(exp(log_lik), cores = 2) 
-# preferably use more than 2 cores (as many cores as possible)
-# will use value of 'mc.cores' option if cores is not specified
-model.loo[[paste0(scenario,"_",Code.focal,"_function_",function.int)]] <- loo::loo(log_lik, 
-                                                               r_eff = r_eff, cores = 2)
-remove(FinalFit)
-    }
-  }
-}
-Se_loo_model <- NULL
-for( scenario in c("low","medium","high")){
-for(Code.focal in c("i","j")){ #,"j"
-comp <- loo_compare(model.loo[[paste0(scenario,"_",Code.focal,"_","function_1")]], 
-                    model.loo[[paste0(scenario,"_",Code.focal,"_","function_2")]],
-                    model.loo[[paste0(scenario,"_",Code.focal,"_","function_3")]],
-                    model.loo[[paste0(scenario,"_",Code.focal,"_","function_4")]])
-model.loo[[Code.focal]] <- comp # The first column shows the difference in ELPD relative to the model with the largest ELPD.
-
-  df_loo <- data.frame(se_diff = model.loo[[Code.focal]][,"se_diff"]) %>%
- rownames_to_column(var = "model") %>%
-    mutate(model = stringi::stri_sub(model,from =6,to=6),
-           scenario = scenario,
-           focal = Code.focal)
-
-  Se_loo_model <- bind_rows(Se_loo_model, df_loo)
-}
-assign(paste0("model.loo.",scenario),
-       model.loo)
-list.name <- paste0("model.loo.",scenario)
-save(list.name,
-     file = paste0("results/model.loo.",scenario,".RData"))
-}
-write.csv(Se_loo_model,
-          paste0("results/Se_loo_model.csv"))
 
 
 ##########################################################################################################

@@ -11,9 +11,9 @@ library(rstan)
 #install.packages("loo")
 library(loo) # Efficient approximate leave-one-out cross-validation
 #install.packages("HDInterval")
-library("HDInterval")
+library(HDInterval)
 #install.packages("tidyverse")
-library("tidyverse")
+library(tidyverse)
 #install.packages("dplyr")
 library(dplyr)
 library(ggpubr)
@@ -21,6 +21,7 @@ library(ggplot2)
 library(odeintr)
 library(brms)
 library(bbmle)
+library(reshape2)
 #rstan_options(auto_write = TRUE)
 
 #---- 1.2. Import the Data ----
@@ -38,32 +39,28 @@ for( scenario in c("low","medium","high")){
 
 # initial conditions for viable seeds in seed bank
 N0 <- c(200,10)
-time.exp.max <- 5 # number of years of data collected
-time.exp.min <- 2
+time.exp.max <- 8 # number of years of data collected
+time.exp.min <- 5
 # number of years to simulate
-nyears <- 30
+nyears <- 100
 params.low <- list(
-  mu    = c(0.10, 0.05), # mortality rate of seeds
-  nu    = c(0.10, 0.05), # mortality rate of ind
-  alpha_ij = 0.75 , #competitive effect of j on i
-  alpha_ji = 0.40 #competitive effect of i on j
+  alpha_ij = 1 , #competitive effect of j on i
+  alpha_ji = 0.50 #competitive effect of i on j
 )
 
 params.medium <- list(
-  mu    = c(0.10, 0.1), # mortality rate of seeds
-  nu    = c(0.10, 0.1), # mortality rate of ind
-  alpha_ij = 0.40 , #competitive effect of j on i
-  alpha_ji = 0.40 #competitive effect of i on j
+  alpha_ij = 0.50 , #competitive effect of j on i
+  alpha_ji = 0.50 #competitive effect of i on j
 
 )
 params.high <- list(
-  mu    = c(0.10, 0.50), # mortality rate of seeds
-  nu    = c(0.10, 0.50), # mortality rate of ind
-  alpha_ij = 0.05 , #competitive effect of j on i
-  alpha_ji = 0.40 #competitive effect of i on j
+  alpha_ij = 0.5 , #competitive effect of j on i
+  alpha_ji = 1 #competitive effect of i on j
 )
 params <- append(get(paste0("params.",scenario)),
                  list( # constant parameters
+                   mu    = c(0.10, 0.10), # mortality rate of seeds
+                   nu    = c(0.10, 0.10), # mortality rate of ind
                    T     = 0.50,
                    gamma = c(0.1, 0.1), # germination rate of seeds
                    r     = c(2.00, 2.00), # intrinsic growth rate
@@ -76,6 +73,8 @@ params.plant <- params #for plant growth phase
 
 params.seed <- append(get(paste0("params.",scenario)), # for seed growth phase
                       list( # constant parameters
+                        mu    = c(0.10, 0.10), # mortality rate of seeds
+                        nu    = c(0.10, 0.10), # mortality rate of ind
                         T     = 0.50,
                         gamma = c(0.7, 0.7), # germination rate of seeds
                         r     = c(0.00, 0.00), # intrinsic growth rate
@@ -106,7 +105,8 @@ for(Code.focal in c("i","j")){ #,"j"
 # subset for one Code.focal species 
     
 SpDataFocal <- simdata[which(simdata$focal == Code.focal),]
-SpDataFocal <- SpDataFocal[which(simulated.data$time>=time.exp.min & simulated.data$time < time.exp.max),]
+#SpDataFocal <- SpDataFocal[which(simulated.data$time>=time.exp.min & 
+#                                   simulated.data$time < time.exp.max),]
 
 #SpDataFocal <- simdata
 #SpDataFocal <- SpDataFocal[which(SpDataFocal$focal == Code.focal),]

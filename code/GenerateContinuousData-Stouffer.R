@@ -104,6 +104,7 @@ write.csv(population.dynamics ,
 ###################################################
 #pdf(paste0("figures/simulated.com.dynamics.",scenario,".pdf"))
 #dev.new(width=16,height=7)
+
 par(oma=c(0,0,0,0), mar=c(4.5,5,4,2))
 layout(mat = matrix(
   1:6,

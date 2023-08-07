@@ -1,0 +1,310 @@
+#### coexistence evaluation for parameter drawn from entire range of potemntial value
+library(broom)
+library(colorspace)
+library(truncnorm)
+##########################################################################################################
+# 1. Compute Low- Density Growth Rates for wide range of parameters
+##########################################################################################################
+source("code/PopProjection_toolbox.R")
+
+# define parameters
+nsims <- 1000
+species <- 2
+function.int <- c(1:4)
+
+# run sim
+set.seed(1608)
+
+# Set parameters lists
+alpha.coexistence <- function(species){
+  a.vec <- sort(rtruncnorm(n=species*species, a=-1, b=0, mean=0, sd=0.2))
+  a.vec <- c(a.vec[1],a.vec[3],a.vec[4],a.vec[2])
+  mat <- matrix(ncol=species, nrow = species, # a_slope, only negative values
+         data = a.vec,
+         dimnames = list(c("i", "j"),
+                         c("i", "j")))
+  return(mat)
+}
+params <-list()
+for( i in 1:nsims){
+    params[[i]] <- list(
+                # stable parameters
+                    sim= i, 
+                    g = c(gi=1,gj=1), # germination rate of seeds
+                    s = c(si= 1,sj= 1), # survival rate of seeds
+                    lambda = c(lambdai= 1 ,lambdaj= 1), # intrinsic fecundity
+                    Nmax =matrix(ncol=species, nrow = species, # N optimal, only positive values
+                                 data = round(abs(runif(species*species, max=10, min = 0))),
+                                 dimnames = list(c("i", "j"),
+                                                 c("i", "j"))),
+                # variable parameters
+                    a_slope = matrix(ncol=species, nrow = species, # a_slope, only negative values
+                                  data = runif(n=species*species, min=-1, max=0),
+                                  dimnames = list(c("i", "j"),
+                                                  c("i", "j"))),
+                    
+                    a_initial = alpha.coexistence(species),
+              
+                    c =matrix(ncol=species, nrow = species, # a_slope, only positive values
+                                     data = rtruncnorm(n=species*species, a=0, b=1, mean=0, sd=1),
+                              dimnames = list(c("i", "j"),
+                                              c("i", "j")))
+                    )
+    if(params[[i]]$a_initial[1,1]*params[[i]]$a_initial[2,2] < 
+       params[[i]]$a_initial[1,2]*params[[i]]$a_initial[2,1]){
+      nsims = nsims - 1}
+
+}
+
+
+df.prob.coexist <- NULL
+df.prob.long<- NULL
+for(i in 1:nsims){
+  for( function.int in 1:4){
+    print(paste0("int ", i,"for funct ",function.int))
+    df.n <- NULL
+    p <- params[[i]]
+    df.n <- as.data.frame(params[[i]]) %>%
+      mutate(focal = c("i","j"))  %>%
+      melt(id.vars="focal")   %>%
+      mutate( vars = paste(variable ,focal,sep=".")) %>%
+      dplyr::select( value, vars) %>%
+      spread(key=vars, value=value) %>%
+      mutate(function.int  = function.int ) # attention!!! identity of the focal is the last suffixes
+    
+    df.long <- NULL
+    df.long <- grwr(par.dat = p, t.num  = 100,
+               function.int) 
+    df <- df.long %>%
+      dplyr::select(invader,grwr,Cgrwc) %>%
+      unique() %>%
+      mutate(grwrChesson = log(grwr)-log(Cgrwc))  %>%
+      melt(id.vars="invader")   %>%
+      mutate( vars = paste(invader,variable,sep=".")) %>%
+      select( value, vars) %>%
+      spread( key=vars, value=value) %>%
+      mutate(prob.coex = case_when(Ni.grwrChesson > 0 &
+                                Nj.grwrChesson > 0  ~ "1", # coexistence
+                                Ni.grwrChesson <= 0 &
+                                  Nj.grwrChesson > 0 | 
+                                  Ni.grwrChesson > 0 &
+                                  Nj.grwrChesson <= 0 | 
+                                  Ni.grwrChesson == 0 &
+                                  Nj.grwrChesson == 0 ~ "0", # competitive exclusion
+                                Ni.grwrChesson < 0 &
+                                  Nj.grwrChesson < 0  ~ "-1"),
+             prob.coex.id = case_when(Ni.grwrChesson > 0 &
+                                        Nj.grwrChesson > 0  ~ "j_i", # coexistence
+                                      Ni.grwrChesson <= 0 &
+                                        Nj.grwrChesson > 0 ~ "j", 
+                                      Ni.grwrChesson > 0 &
+                                        Nj.grwrChesson <= 0 ~ "i", 
+                                      Ni.grwrChesson == 0 &
+                                        Nj.grwrChesson == 0 ~ "0", # competitive exclusion
+                                      Ni.grwrChesson < 0 &
+                                        Nj.grwrChesson < 0  ~ "-1")) #priority effect
+   
+     df.prob.long <- bind_rows(df.prob.long,merge(df.n,df.long))
+    df.prob.coexist <- bind_rows( df.prob.coexist, bind_cols(df.n, df) )
+
+  }
+}
+
+ggplot( df.prob.long[which(df.prob.long$sim.i == 1 &
+                             df.prob.long$function.int == 4),],
+        aes(x=time)) + 
+  geom_line(aes(y= Ni),color="black",alpha=0.2) +
+  geom_line(aes(y= Nj),color="blue",alpha=0.2) + 
+  theme_bw()
+test.ts <- ts(df.prob.long[which(df.prob.long$sim.i == 1 &
+                                df.prob.long$invader == "Nj" &
+                           df.prob.long$function.int == 4),
+                        "Nj"],frequency=50)
+dec.test <- decompose(test.ts,"multiplicative")
+plot(as.ts(dec.test$seasonal))
+plot(as.ts(dec.test$trend))
+plot(as.ts(dec.test$random))
+plot(dec.test)
+frequency(test.ts)
+install.packages("forecast")
+#dependency c("raster","bfast","phenopix","green","SDMTools","forecast",'Kendall',"sp")
+
+library(forecast)
+test.ma <- ma(test.ts,order=20, centre=T)
+plot(test.ts)
+lines(test.ma)
+
+            
+ggplot(df.prob.coexist,aes(x=as.factor(function.int)))+
+  geom_boxplot(aes(y= Ni.grwrChesson),colour="black",alpha=0.5) +
+  geom_boxplot(aes(y= Nj.grwrChesson),colour="blue",alpha=0.5) +
+  scale_y_continuous(limits=c(-2,2))
+
+ggplot(df.prob.long[which(df.prob.long$Ni < 100 &
+                            df.prob.long$Nj < 100 ),],
+       aes(x=time,group=sim.i))+
+  geom_line(aes(y= Ni),color="black",alpha=0.2) +
+  geom_line(aes(y= Nj),color="blue",alpha=0.2) +
+  facet_grid(invader~ as.factor(function.int)) +
+  labs(caption = "Ni in black and Nj in blue, 
+       invader identity by row, 
+       function identity by column") +
+  theme_bw()
+             
+# standardisation 
+write_csv(x = df.prob.coexist, col_names = TRUE, 
+          file = paste0("results/df.prob.coexist.csv"))
+
+df.prob.coexist <- read.csv("results/df.prob.coexist.csv")
+df.prob.coexist.std <- df.prob.coexist %>%
+  mutate(prob.coex = case_when(Ni.grwrChesson > 0 &
+                                 Nj.grwrChesson > 0  ~ 1, # coexistence
+                               Ni.grwrChesson <= 0 &
+                                 Nj.grwrChesson > 0 | 
+                                 Ni.grwrChesson > 0 &
+                                 Nj.grwrChesson <= 0 | 
+                                Ni.grwrChesson == 0 &
+                                 Nj.grwrChesson == 0 ~ 0, # competitive exclusion
+                               Ni.grwrChesson < 0 &
+                                 Nj.grwrChesson < 0  ~ 0))
+
+
+stand.variable <- c(paste0("Nmax",c(".i.j",".i.i",".j.i",".j.j")),
+                    paste0("c",c(".i.j",".i.i",".j.i",".j.j")),
+                    paste0("a_initial",c(".i.j",".i.i",".j.i",".j.j")),
+                    paste0("a_slope",c(".i.j",".i.i",".j.i",".j.j"))
+                    )
+
+df.prob.coexist.std[,stand.variable] <- lapply(df.prob.coexist.std[,stand.variable],
+                                scale)
+df.prob.coexist.std[,"prob.coex"] <- as.numeric(df.prob.coexist.std[,"prob.coex"])
+str(df.prob.coexist.std)
+
+
+
+       
+       
+# Incorporate interaction terms
+model.0 <- glm(prob.coex ~ as.factor(function.int), 
+               data = df.prob.coexist.std[which(df.prob.coexist.std$prob.coex >= 0),],
+               family = "binomial")
+
+model.1 <- glm(formula(paste0("prob.coex  ~ ",
+                             paste(paste0("a_initial",c(".i.j",".i.i",".j.i",".j.j")),collapse = "+"))), 
+   data = subset(df.prob.coexist.std,function.int==1 & prob.coex >= 0),
+   family = "binomial")
+
+model.2 <- glm(formula(paste0("prob.coex  ~ ",
+                             paste(c(paste0("Nmax",c(".i.j",".i.i",".j.i",".j.j")),
+                                     paste0("a_initial",c(".i.j",".i.i",".j.i",".j.j")),
+                                     paste0("a_slope",c(".i.j",".i.i",".j.i",".j.j"))),collapse = "+"))), 
+              data = subset(df.prob.coexist.std,function.int==2 & prob.coex >= 0),
+              family = "binomial")
+
+model.3 <- glm(formula(paste0("prob.coex  ~ ",
+                             paste(stand.variable,collapse = "+"))), 
+              data = subset(df.prob.coexist.std,function.int==3 & prob.coex >= 0),
+              family = "binomial")
+
+model.4 <- glm(formula(paste0("prob.coex  ~ ",
+                             paste(stand.variable,collapse = "+"))), 
+              data = subset(df.prob.coexist.std,function.int==4 & prob.coex >= 0),
+              family = "binomial")
+
+# build dataframe to plot
+ggplot( df.prob.coexist.std, aes(x=prob.coex.id, 
+                             fill=as.factor(function.int)))+
+  stat_count() +theme_bw()
+
+
+sens_out <- tidy(model.1) %>% 
+  mutate(function.int = 1) %>% 
+  bind_rows(
+    (tidy(model.0) %>%
+       mutate(term = "function",
+              function.int = c(1,2,3,4))),
+    (tidy(model.2) %>%
+      mutate(function.int = 2)),
+    (tidy(model.3) %>%
+  mutate(function.int = 3)),
+    (tidy(model.4) %>%
+      mutate(function.int = 4))
+    ) %>%
+  filter(term != "(Intercept)")
+
+sens_out$term <- factor(sens_out$term, 
+                        levels = 
+                          c("function",
+                            paste0("a_initial",c(".i.i",".j.j",".i.j",".j.i")),
+                            paste0("a_slope",c(".i.i",".j.j",".i.j",".j.i")),
+                            paste0("Nmax",c(".i.i",".j.j",".i.j",".j.i")),
+                            paste0("c",c(".i.i",".j.j",".i.j",".j.i"))
+                          )
+)
+# change to have the focal species first
+x_axis_labs <- c("function",
+                 paste0("a_initial",c(".i.i",".j.j",".j.i",".i.j")),
+                 paste0("a_slope",c(".i.i",".j.j",".j.i",".i.j")),
+                 paste0("Nmax",c(".i.i",".j.j",".j.i",".i.j")),
+                 paste0("c",c(".i.i",".j.j",".j.i",".i.j"))
+)
+
+my_cols <- qualitative_hcl(n =4)
+
+int_sensitivity_plot <- sens_out %>% 
+  
+  ggplot(aes(y = estimate, ymin = (estimate - std.error), ymax = (estimate + std.error),
+             color = as.factor(function.int), 
+             fill = as.factor(function.int), x = term)) +
+  #geom_vline(xintercept = c(1:9+0.5), alpha = 0.5, color = "gray50", size = 0.2) +
+  geom_bar(stat = "identity",
+           position = position_dodge(), alpha = 0.7) +
+  geom_errorbar(position = position_dodge(.9), width = 0.5, show.legend = FALSE) +
+  scale_color_manual(values = darken(my_cols, amount = .2)) + 
+  scale_fill_manual(values = my_cols) +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        legend.position = c(.07,.92),
+        legend.background = element_rect(color = "black"),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 11),
+        legend.key.size = unit(0.1, units = "in"),
+        axis.text.x = element_text(size = 12, angle = 45, 
+                                   hjust = 1, margin = margin(t =10))) +
+  #facet_wrap(~comp, nrow = 2) +
+  labs(x = "", y = "Effect Size on \n probability of coexistence", fill = "function", color = "function") +
+  scale_x_discrete(labels = x_axis_labs)
+
+int_sensitivity_plot
+ggsave("figures/sensitivity_analysis.pdf", width = 10, height = 8)
+
+
+
+# plot probability of each function to have coexistence
+
+df <- df.prob.coexist.std
+
+fits <- predict(model.0, newdata = df, se.fit = TRUE)
+
+# Get odds from modrl
+df$prediction <- exp(fits$fit) 
+df$upper <- exp(fits$fit + 1.96 * fits$se.fit)
+df$lower <- exp(fits$fit - 1.96 * fits$se.fit)
+
+# Convert odds to probabilities
+df$prediction <- df$prediction / (1 + df$prediction)
+df$upper <- df$upper / (1 + df$upper)
+df$lower <- df$lower / (1 + df$lower)
+
+# Plot probabilities
+
+ggplot(df, aes(function.int, prediction)) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), 
+                width = 0.25, size = 1, position = position_dodge(width = 0.4)) +
+  geom_point(shape = 21, size = 3, 
+             position = position_dodge(width = 0.4)) +
+  theme_light(base_size = 16) +
+  scale_y_continuous(name = "Probability of coexistence", limits = c(0, 1),
+                     labels = scales::percent)
+

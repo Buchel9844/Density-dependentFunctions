@@ -19,7 +19,7 @@ write_csv(simulated.data,
 
 # the community dynamics over 10 seasons is as followed:
 source("code/GenerateContinuousData-Stouffer.R")
-
+is.data.frame(population.dynamics)
 
 ggsave(paste0("figures/simulated.seed.density.",scenario,".pdf"),
        plot = ggplot(simulated.data[which(simulated.data$time>=time.exp.min & simulated.data$time < time.exp.max),],
@@ -48,7 +48,7 @@ ggsave(paste0("figures/simulated.seed.biomass.",scenario,".pdf"),
                            plants.i,plants.j,key="plants",value="n.ind"),
                     aes(y=fecundity, x=time, color=n.ind)) +
                       geom_point(aes(shape=focal),size=3,position="jitter")+ theme_bw() +
-           labs(title=paste0("Fecundity of species j in the first ",time.exp," for scenario ", scenario))
+           labs(title=paste0("Fecundity of species j between the second and fifth year for scenario ", scenario))
 )
 
 }

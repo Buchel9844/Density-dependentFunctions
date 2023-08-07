@@ -18,7 +18,6 @@ params.high <- list(
 
 list.pars <- list()
 for( scenario in c("low","medium","high")){
-
    for (function.int in c(1:4)){ # c(1:4)
      a_initial <-matrix(nrow=2,ncol=2)
      a_slope <-matrix(nrow=2,ncol=2)
@@ -129,27 +128,32 @@ ggplot() + geom_line(data=df.pop.proj.l,aes(x=t, y=log10(N), colour=Population))
   labs(title = "Projection of seed trajectory for species i (native) and j (competitor)",
        x="Generations", y="Density of viable seeds")
 
-#---- Try with ODE -----
-years = seq(0, 100, by = 0.01)
 
-df.NiNj <- ode(y = y, times = years, 
-                             func = Ricker_function, parms = p,
-               method = "euler")
+#########################
+#Coexistence probability 
+########################
+df.prob.coexist <- NULL
+for( scenario in c("low","medium","high")){
+  for(function.int in c(1:4)){ # c(1:4)
+    df <- NULL
+    p <- list.pars[[paste0("pars_",scenario,"_function_",function.int)]] 
+    y <- state.list[[scenario]]  # initial species densities
+    gens = 25
+    
+    df <- grwr(par.dat = p, t.num  = 100)
+    df$scenario <- scenario
+    df$function.int <- function.int
+    
+    df.prob.coexist <- bind_rows( df.prob.coexist,df)
+  }
+}
 
+df.prob.coexist.out <- df.prob.coexist %>%
+  dplyr::select(invader, grwr, scenario ,function.int , Cgrwc) %>%
+  unique()  %>%
+  mutate(grwrChesson = log(grwr)-log(Cgrwc))
+  
 
-plot(df.NiNj)
-head(df.NiNj)
-df.NiNj.l <- pivot_longer(as.data.frame(df.NiNj), 
-                          cols=2:3, names_to="Population", values_to="N")
-
-ggplot(aes(time, N, colour=Population), data=df.NiNj.l) + geom_line() +
-  scale_y_log10()
-
-
-df.NiNj$function.int <- function.int
-df.NiNj$scenario <- scenario
-
-df.pop.proj <- bind_rows(df.pop.proj, df.NiNj)
-
-
-
+ggplot(df.prob.coexist.out,aes(x=invader,y=grwrChesson)) +
+  geom_point(aes(color=as.factor(function.int)),size=2,alpha=0.6)+
+  facet_grid(.~scenario )

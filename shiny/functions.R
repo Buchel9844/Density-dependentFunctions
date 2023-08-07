@@ -42,13 +42,13 @@ ui <- fluidPage(
                   label =withMathJax("Initial effect of j on i \\(\\alpha_{0,i,j}:\\)"),
                   min = -1,
                   max = 1,
-                  value = 0,
+                  value = -0.1,
                   step=0.01),
       sliderInput("Aslope",
                   label =withMathJax("Per capita effect of one neighbours on species i fecundity \\(\\alpha_{J}:\\)"),
                   min = -1,
                   max = 1,
-                  value = 0.8,
+                  value = -0.8,
                   step=0.01),
       sliderInput("N0",
                   label =withMathJax("Initial density of \\(N_{0,j}:\\)"),
@@ -141,8 +141,8 @@ server <- function(input, output) {
     #alpha = Amin*(exp(-Aslopes*(N-N0)) /(1 + exp(-Aslopes*(N-N0) - c )))
     #e = exp(-c*(N-N0)) # c is stretching the graph horizontally and N0 is translating the graph 
     #a = -Aslopes*e #stretching the graph vertically
-    e = exp(-Aslopes*(N-N0)) # c is stretching the graph horizontally 
-    a = c*(1-e) #stretching the graph vertically
+    e = exp(-c*(N-N0)) # c is stretching the graph horizontally 
+    a = Aslopes*(1-e) #stretching the graph vertically
     d = Amin
     alpha = (a/(1 + e)) + d
     
@@ -164,7 +164,7 @@ server <- function(input, output) {
         values = c("limegreen")) }
     
     
-    f2 <- ggplot(data.frame(N= N - N0, alpha = alpha_function2(Amin,Aslopes,N,N0)), 
+    f2 <- ggplot(data.frame(N= N, alpha = alpha_function2(Amin,Aslopes,N,N0)), 
                  aes(y=alpha, x= N)) +
       geom_line(aes(colour = after_stat(y < 0)))+     
       guides(color="none") + labs(title="function 2") + 
@@ -178,7 +178,7 @@ server <- function(input, output) {
         values = c("limegreen","red")) }
     
     
-    f3 <- ggplot(data.frame(N= N - N0, alpha =  half.signoidal.function(Amin, Aslopes,c ,N,N0)), 
+    f3 <- ggplot(data.frame(N= N, alpha =  half.signoidal.function(Amin, Aslopes,c ,N,N0)), 
                  aes(y=alpha, x= N))+
       #geom_smooth(alpha=0.8,color="grey") +
       labs(title="function 3") + 
@@ -193,7 +193,7 @@ server <- function(input, output) {
       }else{scale_colour_manual(
         values = c("limegreen","red")) }
     
-    f4 <- ggplot(data.frame(N= N - N0, alpha = signoidal.function(Amin, Aslopes,c ,N,N0)), 
+    f4 <- ggplot(data.frame(N= N , alpha = signoidal.function(Amin, Aslopes,c ,N,N0)), 
                  aes(y=alpha, x= N))+
       #geom_smooth(alpha=0.8,color="grey") + 
       labs(title="function 4") + 
@@ -261,7 +261,7 @@ server <- function(input, output) {
       paste0("function 3: \\({\\alpha}_{ij} =  \\alpha_{ 0,i,j} + \\alpha_{J}*(1-e^{-c({N}_{j}-N_{0,j})} \\)"),
       br(),
       br(),
-      paste0("function 4: \\({\\alpha}_{ij} = \\alpha_{ 0,i,j} - \\dfrac{c*(1-e^{-\\alpha_{J}({N}_j- N_{0,j})})}{1+e^{-\\alpha_{J}({N}_j - N_{0,j})}}\\)"),
+      paste0("function 4: \\({\\alpha}_{ij} = \\alpha_{ 0,i,j} + \\dfrac{\\alpha_{J}*(1-e^{-c({N}_j- N_{0,j})})}{1+e^{-c({N}_j - N_{0,j})}}\\)"),
       br(),
       paste0("Interaction of j on i when neighbourhood density \\({N}_j = 0\\), is equal to (\\(\\alpha_{ 0,i,j}\\))  :", x),
       br(),
