@@ -267,7 +267,7 @@ knitr::include_graphics(path = "/Users/lisabuche/Documents/Projects/Density-depe
 
 # Population projection
 
-We can evaluate which density-dependent functions has the best projection compared to the observed community projection. The population projections are not great, which I am working on to understand why. (original code PopProjection.R and PopProjection_toolbox.R)
+We can evaluate which density-dependent functions has the best projection compared to the observed community projection (faded lines). The population projections are not great, especially for medium, which I am working on to understand why. (original code PopProjection.R and PopProjection_toolbox.R)
 
 ```{r projection population, echo=FALSE}
 
@@ -279,7 +279,7 @@ ggplot() + geom_line(data=df.pop.proj.l,aes(x=t, y=log10(N), colour=Population))
   geom_point(data=df.pop.proj.l,aes(x=t, y=log10(N), colour=Population)) +
   facet_grid(scenario~function.int, scale="free")+
   geom_line(data=population.dynamics.all,
-            aes(x=Time-time.exp.max, y=log10(N), colour=Population),
+            aes(x=Time-time.exp.max, y=log10(N), colour=Population),linetype="dashed",
             alpha=0.5) +
   theme_bw() +
   scale_color_manual(values=c("black","red")) +

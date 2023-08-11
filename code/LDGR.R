@@ -2,6 +2,18 @@
 library(broom)
 library(colorspace)
 library(truncnorm)
+library(rstan)
+library(loo) # Efficient approximate leave-one-out cross-validation
+library(HDInterval)
+library(tidyverse)
+library(dplyr)
+library(ggpubr)
+library(ggplot2)
+library(odeintr)
+library(brms)
+library(bbmle)
+library(reshape2)
+library(ggthemes)
 ##########################################################################################################
 # 1. Compute Low- Density Growth Rates for wide range of parameters
 ##########################################################################################################
@@ -59,6 +71,8 @@ for( i in 1:nsims){
 
 df.prob.coexist <- NULL
 df.prob.long<- NULL
+df.prob.hory <- NULL
+df.list.prob <- NULL
 for(i in 1:nsims){
   for( function.int in 1:4){
     print(paste0("int ", i,"for funct ",function.int))
@@ -72,74 +86,139 @@ for(i in 1:nsims){
       spread(key=vars, value=value) %>%
       mutate(function.int  = function.int ) # attention!!! identity of the focal is the last suffixes
     
-    df.long <- NULL
-    df.long <- grwr(par.dat = p, t.num  = 100,
-               function.int) 
-    df <- df.long %>%
-      dplyr::select(invader,grwr,Cgrwc) %>%
+    df.list <- NULL
+    df.list <- grwr(par.dat = p, t.num  = 100,
+         function.int)
+    df.vert <- df.list[["vert"]]
+
+    df <- df.vert%>% # summary for when time = 1
+      dplyr::filter(time==1) %>%
+      dplyr::select(invader,grwr,Cgrwc,grwrChesson,grwrStouffer) %>%
       unique() %>%
-      mutate(grwrChesson = log(grwr)-log(Cgrwc))  %>%
       melt(id.vars="invader")   %>%
       mutate( vars = paste(invader,variable,sep=".")) %>%
       select( value, vars) %>%
       spread( key=vars, value=value) %>%
-      mutate(prob.coex = case_when(Ni.grwrChesson > 0 &
-                                Nj.grwrChesson > 0  ~ "1", # coexistence
-                                Ni.grwrChesson <= 0 &
-                                  Nj.grwrChesson > 0 | 
-                                  Ni.grwrChesson > 0 &
-                                  Nj.grwrChesson <= 0 | 
-                                  Ni.grwrChesson == 0 &
-                                  Nj.grwrChesson == 0 ~ "0", # competitive exclusion
+      mutate(prob.coex.chess = case_when(Ni.grwrChesson >= 0 &
+                                Nj.grwrChesson >= 0  ~ 1, # coexistence
                                 Ni.grwrChesson < 0 &
-                                  Nj.grwrChesson < 0  ~ "-1"),
-             prob.coex.id = case_when(Ni.grwrChesson > 0 &
-                                        Nj.grwrChesson > 0  ~ "j_i", # coexistence
-                                      Ni.grwrChesson <= 0 &
+                                Nj.grwrChesson < 0  ~ -1,
+                                 TRUE~ 0 ), # competitive exclusion
+             prob.coex.id.chess = case_when(Ni.grwrChesson >= 0 &
+                                        Nj.grwrChesson >= 0  ~ "j_i", # coexistence
+                                      Ni.grwrChesson < 0 &
                                         Nj.grwrChesson > 0 ~ "j", 
                                       Ni.grwrChesson > 0 &
-                                        Nj.grwrChesson <= 0 ~ "i", 
-                                      Ni.grwrChesson == 0 &
-                                        Nj.grwrChesson == 0 ~ "0", # competitive exclusion
+                                        Nj.grwrChesson < 0 ~ "i", # competitive exclusion
                                       Ni.grwrChesson < 0 &
-                                        Nj.grwrChesson < 0  ~ "-1")) #priority effect
-   
-     df.prob.long <- bind_rows(df.prob.long,merge(df.n,df.long))
+                                        Nj.grwrChesson < 0  ~ "-1"),#priority effect
+             prob.coex.stouff = case_when(Ni.grwrStouffer >= 0 &
+                                     Nj.grwrStouffer >= 0  ~ 1, # coexistence
+                                   Ni.grwrStouffer < 0 &
+                                     Nj.grwrStouffer < 0  ~ -1,
+                                   TRUE~ 0 )) 
+    
+    df.hory <- df.list[["hory"]] %>%
+      mutate(coex.stouff = case_when(grwrStouffer.Ni > 0 &
+                                       grwrStouffer.Nj > 0  ~ "coex", # coexistence
+                                     grwrStouffer.Ni == 0 &
+                                       grwrStouffer.Nj == 0  ~ "stable",
+                                   TRUE ~ "comp"),
+             prob.coex.stouff = sum(which(coex.stouff =="coex")),
+             prob.stable.stouff = sum(which(coex.stouff =="stable")),
+             coex.chess = case_when(grwrChesson.Ni > 0 &
+                                      grwrChesson.Nj > 0  ~ "coex", # coexistence
+                                    grwrChesson.Ni == 0 &
+                                      grwrChesson.Nj == 0  ~ "stable",
+                                     TRUE~ "comp"),
+             prob.coex.chess= sum(which(coex.chess =="coex")),
+             prob.stable.chess = sum(which(coex.chess =="stable"))) %>%
+      dplyr::filter(time==1)
+    
+    df.list.prob[[paste0("int_", i,"_funct_",function.int)]] <-  df.list
+    df.prob.long <- bind_rows(df.prob.long,merge(df.n,df.vert))
+    df.prob.hory <- bind_rows(df.prob.hory,merge(df.n,df.hory))
     df.prob.coexist <- bind_rows( df.prob.coexist, bind_cols(df.n, df) )
 
   }
 }
+save(df.list.prob,
+     file= "results/df.list.prob.Rdata")
 
-ggplot( df.prob.long[which(df.prob.long$sim.i == 1 &
-                             df.prob.long$function.int == 4),],
-        aes(x=time)) + 
-  geom_line(aes(y= Ni),color="black",alpha=0.2) +
-  geom_line(aes(y= Nj),color="blue",alpha=0.2) + 
-  theme_bw()
-test.ts <- ts(df.prob.long[which(df.prob.long$sim.i == 1 &
-                                df.prob.long$invader == "Nj" &
-                           df.prob.long$function.int == 4),
-                        "Nj"],frequency=50)
-dec.test <- decompose(test.ts,"multiplicative")
-plot(as.ts(dec.test$seasonal))
-plot(as.ts(dec.test$trend))
-plot(as.ts(dec.test$random))
-plot(dec.test)
-frequency(test.ts)
-install.packages("forecast")
-#dependency c("raster","bfast","phenopix","green","SDMTools","forecast",'Kendall',"sp")
 
-library(forecast)
-test.ma <- ma(test.ts,order=20, centre=T)
-plot(test.ts)
-lines(test.ma)
+write_csv(x = df.prob.coexist, col_names = TRUE, 
+          file = paste0("results/df.prob.coexist.csv"))
+write_csv(x = df.prob.hory, col_names = TRUE, 
+          file = paste0("results/df.prob.hory.csv"))
+write_csv(x = df.prob.long , col_names = TRUE, 
+          file = paste0("results/df.prob.long.csv"))
 
-            
-ggplot(df.prob.coexist,aes(x=as.factor(function.int)))+
-  geom_boxplot(aes(y= Ni.grwrChesson),colour="black",alpha=0.5) +
-  geom_boxplot(aes(y= Nj.grwrChesson),colour="blue",alpha=0.5) +
-  scale_y_continuous(limits=c(-2,2))
 
+
+#check
+
+if(df$Nj.grwrChesson == log(df.long[which(df.long$invader== "Nj"),]$Nj[2])  -
+  log(df.long[which(df.long$invader== "Ni"),]$Nj[2]/df.long[which(df.long$invader== "Ni"),]$Nj[1])){
+  
+  print("Growth when rare compute correctly as: \n
+        (GR of Nj when invading Ni) - (GR of Nj when at eq. and Ni invader)")
+}
+
+df.prob.long[which(df.prob.long$sim.i == 2 &
+                     (df.prob.long$function.int == 1 |
+                     df.prob.long$function.int == 4)),] %>%
+  gather(Ni, Nj, key="species", value="abundance") %>%
+ ggplot(aes(x=time,group=species)) + 
+  geom_smooth(aes(y=abundance,color=species,fill=species),alpha=0.2,size=0.5, linetype="dashed") +
+  geom_line(aes(y= abundance,color=species),alpha=0.8) +
+  theme_bw() + facet_wrap(function.int~invader) + 
+  geom_text(aes(label=grwrChesson, y= 7, x=75),color=rep(c("black",rep("NA",times=100)),times=8))+ 
+              scale_colour_colorblind() +
+  scale_fill_colorblind() +
+  labs(title="abundances Ni and Nj over time when invading for function 1 and function 4")
+
+ggsave(last_plot(),
+       file = "figures/example.alternative.state.pdf")
+
+# for sim = 2 in above loop
+GRWR.list <- list()
+sim = 2
+t.num= 100
+for(function.int in c(1:4)){
+  par.dat <- params[[sim]]
+N3 <- df.prob.long[which(df.prob.long$sim.i == sim &
+                           df.prob.long$function.int == function.int &
+                           df.prob.long$invader =="Ni"),c("Ni","Nj")][1,] 
+N4 <- df.prob.long[which(df.prob.long$sim.i == sim &
+                           df.prob.long$function.int == function.int &
+                           df.prob.long$invader =="Nj"),c("Ni","Nj")][1,]
+
+GRWR.list[[function.int]] <- data.frame(time=c(0:t.num),
+                                        GRWR.i = #log(Ricker_solution_ODE(state = N4, pars= par.dat, gens=t.num,
+                    #function.int)[,"Ni"]) -
+  log(Ricker_solution_ODE(state =  N3, pars= par.dat, gens=t.num,function.int)[,"dNi"]),
+  GRWR.j = log(Ricker_solution_ODE(state = N4, pars= par.dat, gens=t.num,
+                                   function.int)[,"dNj"]) ) %>%
+  mutate(coex = case_when(GRWR.i > 0 & GRWR.j> 0 ~ 0,
+                          GRWR.i == 0 & GRWR.j == 0 ~ 0),
+         col.coex = case_when(GRWR.i >0 & GRWR.j> 0 ~ "coex",
+                          GRWR.i == 0 & GRWR.j == 0 ~ "stable")) %>%
+  gather(GRWR.i, GRWR.j, key="species", value="GRWR") %>%
+  ggplot(aes(x=time)) + 
+  geom_line(aes(y=GRWR,color=species),alpha=0.7,size=1)  + 
+  geom_point(aes(y=coex,color=col.coex ),shape=1,size= rep(c(1,2,rep(1,each=99)),time=2)) + 
+  geom_vline(aes(xintercept=1),linetype="dashed",color="black",alpha=0.7) +
+  theme_bw() + scale_colour_colorblind() +
+  guides(alpha="none")+
+  labs(title=paste0("GRWR at each time step for Ni and Nj \n for sim ",sim," and function ",function.int)) 
+}
+ggarrange(plotlist = GRWR.list, ncol=2, nrow=2,common.legend = T,
+          legend = "right")
+
+ggsave(last_plot(),
+       file = "figures/example.GRWR.all.timesteps.pdf")
+
+          
 ggplot(df.prob.long[which(df.prob.long$Ni < 100 &
                             df.prob.long$Nj < 100 ),],
        aes(x=time,group=sim.i))+
@@ -150,10 +229,9 @@ ggplot(df.prob.long[which(df.prob.long$Ni < 100 &
        invader identity by row, 
        function identity by column") +
   theme_bw()
+
              
 # standardisation 
-write_csv(x = df.prob.coexist, col_names = TRUE, 
-          file = paste0("results/df.prob.coexist.csv"))
 
 df.prob.coexist <- read.csv("results/df.prob.coexist.csv")
 df.prob.coexist.std <- df.prob.coexist %>%
@@ -180,8 +258,12 @@ df.prob.coexist.std[,stand.variable] <- lapply(df.prob.coexist.std[,stand.variab
 df.prob.coexist.std[,"prob.coex"] <- as.numeric(df.prob.coexist.std[,"prob.coex"])
 str(df.prob.coexist.std)
 
-
-
+ggplot( df.prob.coexist, aes(x=prob.coex.id, 
+                                 fill=as.factor(function.int)))+
+  stat_count() +theme_bw()
+ggplot( df.prob.coexist, aes(x=prob.coex, 
+                             fill=as.factor(function.int)))+
+  stat_count() +theme_bw()
        
        
 # Incorporate interaction terms
