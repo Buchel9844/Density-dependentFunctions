@@ -71,7 +71,6 @@ for( i in 1:nsims){
 
 df.prob.coexist <- NULL
 df.prob.long<- NULL
-df.prob.hory <- NULL
 df.list.prob <- NULL
 for(i in 1:nsims){
   for( function.int in 1:4){
@@ -104,55 +103,34 @@ for(i in 1:nsims){
                                 Ni.grwrChesson < 0 &
                                 Nj.grwrChesson < 0  ~ -1,
                                  TRUE~ 0 ), # competitive exclusion
-             prob.coex.id.chess = case_when(Ni.grwrChesson >= 0 &
-                                        Nj.grwrChesson >= 0  ~ "j_i", # coexistence
-                                      Ni.grwrChesson < 0 &
-                                        Nj.grwrChesson > 0 ~ "j", 
-                                      Ni.grwrChesson > 0 &
-                                        Nj.grwrChesson < 0 ~ "i", # competitive exclusion
-                                      Ni.grwrChesson < 0 &
-                                        Nj.grwrChesson < 0  ~ "-1"),#priority effect
-             prob.coex.stouff = case_when(Ni.grwrStouffer >= 0 &
-                                     Nj.grwrStouffer >= 0  ~ 1, # coexistence
-                                   Ni.grwrStouffer < 0 &
-                                     Nj.grwrStouffer < 0  ~ -1,
-                                   TRUE~ 0 )) 
+             prob.coex.id.chess = case_when(Ni.grwrChesson >= 0 & Nj.grwrChesson >= 0  ~ "j_i", # coexistence
+                                      Ni.grwrChesson < 0 & Nj.grwrChesson > 0 ~ "j", 
+                                      Ni.grwrChesson > 0 & Nj.grwrChesson < 0 ~ "i", # competitive exclusion
+                                      Ni.grwrChesson < 0 & Nj.grwrChesson < 0  ~ "-1"),#priority effect
+             prob.coex.stouff = case_when(Ni.grwrStouffer >= 0 & Nj.grwrStouffer >= 0  ~ 1, # coexistence
+                                   Ni.grwrStouffer < 0 &  Nj.grwrStouffer < 0  ~ -1,
+                                   TRUE~ 0 )) %>%
+      merge(df.n)
     
-    df.hory <- df.list[["hory"]] %>%
-      mutate(coex.stouff = case_when(grwrStouffer.Ni > 0 &
-                                       grwrStouffer.Nj > 0  ~ "coex", # coexistence
-                                     grwrStouffer.Ni == 0 &
-                                       grwrStouffer.Nj == 0  ~ "stable",
-                                   TRUE ~ "comp"),
-             prob.coex.stouff = sum(which(coex.stouff =="coex")),
-             prob.stable.stouff = sum(which(coex.stouff =="stable")),
-             coex.chess = case_when(grwrChesson.Ni > 0 &
-                                      grwrChesson.Nj > 0  ~ "coex", # coexistence
-                                    grwrChesson.Ni == 0 &
-                                      grwrChesson.Nj == 0  ~ "stable",
-                                     TRUE~ "comp"),
-             prob.coex.chess= sum(which(coex.chess =="coex")),
-             prob.stable.chess = sum(which(coex.chess =="stable"))) %>%
-      dplyr::filter(time==1)
     
     df.list.prob[[paste0("int_", i,"_funct_",function.int)]] <-  df.list
-    df.prob.long <- bind_rows(df.prob.long,merge(df.n,df.vert))
-    df.prob.hory <- bind_rows(df.prob.hory,merge(df.n,df.hory))
+    df.prob.long <- bind_rows(df.prob.long,df.vert)
     df.prob.coexist <- bind_rows( df.prob.coexist, bind_cols(df.n, df) )
 
   }
 }
+
+# save .csv
+
 save(df.list.prob,
      file= "results/df.list.prob.Rdata")
-
 
 write_csv(x = df.prob.coexist, col_names = TRUE, 
           file = paste0("results/df.prob.coexist.csv"))
 write_csv(x = df.prob.hory, col_names = TRUE, 
           file = paste0("results/df.prob.hory.csv"))
 write_csv(x = df.prob.long , col_names = TRUE, 
-          file = paste0("results/df.prob.long.csv"))
-
+          file = paste0("results/df.prob.long.csv.gz"))
 
 
 #check
@@ -164,11 +142,15 @@ if(df$Nj.grwrChesson == log(df.long[which(df.long$invader== "Nj"),]$Nj[2])  -
         (GR of Nj when invading Ni) - (GR of Nj when at eq. and Ni invader)")
 }
 
-df.prob.long[which(df.prob.long$sim.i == 2 &
+##########################################################################################################
+# 2. Visualise population dynamics
+##########################################################################################################
+
+df.prob.long[which(df.prob.long$sim.i == 6 &
                      (df.prob.long$function.int == 1 |
                      df.prob.long$function.int == 4)),] %>%
   gather(Ni, Nj, key="species", value="abundance") %>%
- ggplot(aes(x=time,group=species)) + 
+  ggplot(aes(x=time,group=species)) + 
   geom_smooth(aes(y=abundance,color=species,fill=species),alpha=0.2,size=0.5, linetype="dashed") +
   geom_line(aes(y= abundance,color=species),alpha=0.8) +
   theme_bw() + facet_wrap(function.int~invader) + 
@@ -182,7 +164,7 @@ ggsave(last_plot(),
 
 # for sim = 2 in above loop
 GRWR.list <- list()
-sim = 2
+sim = 6
 t.num= 100
 for(function.int in c(1:4)){
   par.dat <- params[[sim]]
@@ -218,33 +200,94 @@ ggarrange(plotlist = GRWR.list, ncol=2, nrow=2,common.legend = T,
 ggsave(last_plot(),
        file = "figures/example.GRWR.all.timesteps.pdf")
 
-          
-ggplot(df.prob.long[which(df.prob.long$Ni < 100 &
-                            df.prob.long$Nj < 100 ),],
-       aes(x=time,group=sim.i))+
-  geom_line(aes(y= Ni),color="black",alpha=0.2) +
-  geom_line(aes(y= Nj),color="blue",alpha=0.2) +
-  facet_grid(invader~ as.factor(function.int)) +
-  labs(caption = "Ni in black and Nj in blue, 
-       invader identity by row, 
-       function identity by column") +
-  theme_bw()
 
-             
-# standardisation 
+    
+##########################################################################################################
+# 3. Compute slopes of growth over time
+##########################################################################################################
+ 
+df.glm_all <- NULL
+
+for(i in 1:nsims){
+  for( function.int in 1:4){
+    print(paste0("int ", i,"for funct ",function.int))
+    
+df.Ni <- df.prob.long[which(df.prob.long$sim.i == i &
+                     df.prob.long$function.int == function.int &
+                     df.prob.long$invader =="Ni"),]
+if(sum(is.na(df.Ni$Ni))>1) next
+if(df.Ni$Nj[1] ==0) next
+if(df.Ni$Ni[2] >1000 | df.Ni$Nj[2] >1000) next
+
+df.Ni.glm <- as.data.frame(summary(glm(formula = Ni ~ time, data = df.Ni,
+            family = "gaussian"))$coefficients) %>%
+  rownames_to_column(var="coeff") %>%
+  mutate(coeff = case_when(coeff =="(Intercept)" ~ "intercept",
+                           coeff =="time"~"time")) %>%
+  select(coeff,Estimate ) %>%
+  mutate(coeff = paste0( coeff,".Ni"))%>%
+  spread(coeff,Estimate) %>%
+  mutate(com.comp.Ni = intercept.Ni + 100*time.Ni,
+         com.comp.prob.Ni = case_when(com.comp.Ni>0~T,
+                                   com.comp.Ni<0~F),
+         sim.i = i,
+         function.int = function.int)
+
+
+df.Nj <- df.prob.long[which(df.prob.long$sim.i == i &
+                              df.prob.long$function.int == function.int &
+                              df.prob.long$invader =="Nj"),]
+if(sum(is.na(df.Nj$Nj))>1) next
+if(df.Nj$Ni[1] ==0) next
+if(df.Nj$Ni[2] >1000 | df.Nj$Nj[2] >1000) next
+df.Nj.glm <- as.data.frame(summary(glm(formula = Nj ~ time, data = df.Nj,
+                                       family = "gaussian"))$coefficients) %>%
+  rownames_to_column(var="coeff") %>%
+  mutate(coeff = case_when(coeff =="(Intercept)" ~ "intercept",
+                           coeff =="time"~"time")) %>%
+  select(coeff,Estimate ) %>%
+  mutate(coeff = paste0( coeff,".Nj"))%>%
+  spread(coeff,Estimate) %>%
+  mutate(com.comp.Nj = intercept.Nj + 100*time.Nj,
+         com.comp.prob.Nj = case_when(com.comp.Nj>0~T,
+                                      com.comp.Nj<0~F),
+         sim.j = i,
+         function.int = function.int)
+
+df.glm <- right_join(df.Ni.glm,df.Nj.glm) %>%
+  mutate(com.comp.coex = case_when(com.comp.Ni > 0 &com.comp.Nj > 0 ~ "j_i",
+                          com.comp.Ni <= 0 & com.comp.Nj > 0 ~ "j",
+                          com.comp.Ni > 0 & com.comp.Nj <= 0 ~ "i",
+                          com.comp.Ni <= 0 & com.comp.Nj <= 0 ~ "-1"))
+
+df.glm_all <- bind_rows(df.glm_all,df.glm )
+ }
+}
+head(df.glm_all)
+str(df.glm_all)
+ggplot(df.glm_all,aes(x=time.Ni, 
+                      y=time.Nj,color=as.factor(function.int)))+ geom_point(alpha=0.5) + theme_bw() 
+
+
+
+
+ ##########################################################################################################
+# 4. Standardisation
+##########################################################################################################
+
 
 df.prob.coexist <- read.csv("results/df.prob.coexist.csv")
 df.prob.coexist.std <- df.prob.coexist %>%
-  mutate(prob.coex = case_when(Ni.grwrChesson > 0 &
-                                 Nj.grwrChesson > 0  ~ 1, # coexistence
-                               Ni.grwrChesson <= 0 &
-                                 Nj.grwrChesson > 0 | 
-                                 Ni.grwrChesson > 0 &
-                                 Nj.grwrChesson <= 0 | 
-                                Ni.grwrChesson == 0 &
-                                 Nj.grwrChesson == 0 ~ 0, # competitive exclusion
-                               Ni.grwrChesson < 0 &
-                                 Nj.grwrChesson < 0  ~ 0))
+  mutate(prob.coex.chesson = case_when(Ni.grwrChesson > 0 & Nj.grwrChesson > 0  ~ 1, # coexistence
+                                 Ni.grwrChesson <= 0 & Nj.grwrChesson > 0 | 
+                                 Ni.grwrChesson > 0 & Nj.grwrChesson <= 0 | 
+                                 Ni.grwrChesson == 0 & Nj.grwrChesson == 0 ~ 0, # competitive exclusion
+                                 Ni.grwrChesson < 0 & Nj.grwrChesson < 0  ~ 0)) %>%
+  left_join(df.glm_all, by=c("sim.i","sim.j","function.int")) %>%
+  mutate(prob.com.comp.coex =case_when(com.comp.Ni > 0 &com.comp.Nj > 0 ~ 1,
+                                       com.comp.Ni <= 0 &com.comp.Nj > 0 ~ 0,
+                                       com.comp.Ni > 0 &com.comp.Nj <= 0 ~ 0,
+                                       com.comp.Ni <= 0 &com.comp.Nj <= 0 ~ 0))
 
 
 stand.variable <- c(paste0("Nmax",c(".i.j",".i.i",".j.i",".j.j")),
@@ -258,37 +301,41 @@ df.prob.coexist.std[,stand.variable] <- lapply(df.prob.coexist.std[,stand.variab
 df.prob.coexist.std[,"prob.coex"] <- as.numeric(df.prob.coexist.std[,"prob.coex"])
 str(df.prob.coexist.std)
 
-ggplot( df.prob.coexist, aes(x=prob.coex.id, 
+ggplot( df.prob.coexist.std, aes(x=prob.coex.id, 
                                  fill=as.factor(function.int)))+
   stat_count() +theme_bw()
-ggplot( df.prob.coexist, aes(x=prob.coex, 
+ggplot( df.prob.coexist.std, aes(x=com.comp.coex , 
                              fill=as.factor(function.int)))+
   stat_count() +theme_bw()
        
-       
+##########################################################################################################
+# 5. Sensitivity analysis
+##########################################################################################################
+
 # Incorporate interaction terms
-model.0 <- glm(prob.coex ~ as.factor(function.int), 
+
+model.0 <- glm(prob.com.comp.coex ~ as.factor(function.int), 
                data = df.prob.coexist.std[which(df.prob.coexist.std$prob.coex >= 0),],
                family = "binomial")
 
-model.1 <- glm(formula(paste0("prob.coex  ~ ",
+model.1 <- glm(formula(paste0("prob.com.comp.coex  ~ ",
                              paste(paste0("a_initial",c(".i.j",".i.i",".j.i",".j.j")),collapse = "+"))), 
    data = subset(df.prob.coexist.std,function.int==1 & prob.coex >= 0),
    family = "binomial")
 
-model.2 <- glm(formula(paste0("prob.coex  ~ ",
+model.2 <- glm(formula(paste0("prob.com.comp.coex  ~ ",
                              paste(c(paste0("Nmax",c(".i.j",".i.i",".j.i",".j.j")),
                                      paste0("a_initial",c(".i.j",".i.i",".j.i",".j.j")),
                                      paste0("a_slope",c(".i.j",".i.i",".j.i",".j.j"))),collapse = "+"))), 
               data = subset(df.prob.coexist.std,function.int==2 & prob.coex >= 0),
               family = "binomial")
 
-model.3 <- glm(formula(paste0("prob.coex  ~ ",
+model.3 <- glm(formula(paste0("prob.com.comp.coex  ~ ",
                              paste(stand.variable,collapse = "+"))), 
               data = subset(df.prob.coexist.std,function.int==3 & prob.coex >= 0),
               family = "binomial")
 
-model.4 <- glm(formula(paste0("prob.coex  ~ ",
+model.4 <- glm(formula(paste0("prob.com.comp.coex  ~ ",
                              paste(stand.variable,collapse = "+"))), 
               data = subset(df.prob.coexist.std,function.int==4 & prob.coex >= 0),
               family = "binomial")
@@ -329,7 +376,7 @@ x_axis_labs <- c("function",
                  paste0("a_slope",c(".i.i",".j.j",".j.i",".i.j")),
                  paste0("Nmax",c(".i.i",".j.j",".j.i",".i.j")),
                  paste0("c",c(".i.i",".j.j",".j.i",".i.j"))
-)
+                 )
 
 my_cols <- qualitative_hcl(n =4)
 
