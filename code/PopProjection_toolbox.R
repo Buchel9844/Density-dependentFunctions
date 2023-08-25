@@ -225,7 +225,8 @@ Ricker_solution_mono <- function(gens,
 
 
 # function modified from https://github.com/laurenmh/avena-erodium/blob/master/invader_resident_comparison.R
-grwr = function(par.dat, t.num,function.int) {
+
+GrowthSimInv = function(par.dat, t.num,function.int) {
   
   N1 = c(1,0) #c("Ni", "Nj")
   Niequil <- Ricker_solution_mono(state =  N1, pars= par.dat, gens=t.num,
@@ -237,42 +238,23 @@ grwr = function(par.dat, t.num,function.int) {
   
   
   N3 = c(Niequil[t.num, 2],1) #c("Ni*", "Nj")
-  Njinvade <- Ricker_solution(state = N3, pars= par.dat, gens=t.num,
+  Njinvade <- Ricker_solution_ODE(state = N3, pars= par.dat, gens=t.num,
                               function.int)
   
   Njinvade$invader <- "Nj"
   Njinvade$time <- as.numeric(row.names(Njinvade))
   
   N4 = c(1, Njequil[t.num, 3]) #c("Ni", "Nj")
-  Niinvade <- Ricker_solution(state = N4, pars= par.dat, gens=t.num,
+  Niinvade <- Ricker_solution_ODE(state = N4, pars= par.dat, gens=t.num,
                               function.int)
   
   Niinvade$invader <- "Ni"
   Niinvade$time <- as.numeric(row.names(Niinvade))
   
-  Niinvade$grwr <- NA
-  Niinvade$Cgrwc<- NA
-  Njinvade$grwr<- NA
-  Njinvade$Cgrwc<- NA
-  Niinvade$grwrChesson<- NA
-  Njinvade$grwrChesson<- NA
-  Niinvade$grwrStouffer<- NA
-  Njinvade$grwrStouffer<- NA
+  df <- rbind(Niinvade, Njinvade) 
   
-  for( t in 1:t.num){
-    Niinvade$grwr[t] <- Niinvade$Ni[t+1]/Niinvade$Ni[t]
-    Niinvade$Cgrwc[t] <- Niinvade$Nj[t+1]/Niinvade$Nj[t]
-    Njinvade$grwr[t] <- Njinvade$Nj[t+1]/Njinvade$Nj[t]
-    Njinvade$Cgrwc[t] <- Njinvade$Ni[t+1]/Njinvade$Ni[t]
-    
-    Niinvade$grwrChesson[t] = log(Niinvade$grwr[t]) - log(Njinvade$Cgrwc[t])# for Ni
-    Njinvade$grwrChesson[t] = log(Njinvade$grwr[t]) - log(Niinvade$Cgrwc[t]) # for Nj
-    
-    Niinvade$grwrStouffer[t] = log(Niinvade$grwr[t]) 
-    Njinvade$grwrStouffer[t] = log(Njinvade$grwr[t]) 
-  }
-  
-  vert <- rbind(Niinvade, Njinvade) 
-
-  return(list(vert=vert))
+  return(df)
 }  
+
+
+
