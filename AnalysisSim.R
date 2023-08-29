@@ -11,7 +11,7 @@ for(i in 1:nsims){
     print(paste0("int ", i,"for funct ",function.int))
     
     # Slope of Ni with init.cond= c(1,Nj*)
-    df.Ni <- df.sim[which(df.sim$sim == i &
+    df.Ni <- df.sim[which(df.sim$sim.i == i &
                                   df.sim$function.int == function.int &
                                   df.sim$invader =="Ni"),]
     if(sum(is.na(df.Ni$Ni))>1) next
@@ -33,7 +33,7 @@ for(i in 1:nsims){
              function.int = function.int)
     
     # Slope of Nj with init.cond= c(Ni*,1)
-    df.Nj <- df.sim[which(df.sim$sim == i &
+    df.Nj <- df.sim[which(df.sim$sim.i == i &
                                   df.sim$function.int == function.int &
                                   df.sim$invader =="Nj"),]
     if(sum(is.na(df.Nj$Nj))>1) next
@@ -54,7 +54,7 @@ for(i in 1:nsims){
              function.int = function.int)
     
     # Slope of Nj with init.cond= c(1,1)
-    df.Ni.both <- df.sim[which(df.sim$sim == i &
+    df.Ni.both <- df.sim[which(df.sim$sim.i == i &
                             df.sim$function.int == function.int &
                             df.sim$invader =="both"),]
     if(sum(is.na(df.Ni$Ni))>1) next
@@ -69,14 +69,14 @@ for(i in 1:nsims){
       mutate(coeff = paste0( coeff,".Ni"))%>%
       spread(coeff,Estimate) %>%
       mutate(com.comp.Ni.both = intercept.Ni + 100*time.Ni,
-             com.comp.prob.Ni.both = case_when(com.comp.Ni>0~T,
-                                          com.comp.Ni<0~F),
+             com.comp.prob.Ni.both = case_when(com.comp.Ni.both >0 ~ T,
+                                               com.comp.Ni.both < 0 ~ F),
              sim = i,
              function.int = function.int)
     
     # Slope of Nj with init.cond= c(1,1)
     
-    df.Nj.both <- df.sim[which(df.sim$sim == i &
+    df.Nj.both <- df.sim[which(df.sim$sim.i == i &
                             df.sim$function.int == function.int &
                             df.sim$invader =="both"),]
     if(sum(is.na(df.Nj$Nj))>1) next
@@ -91,14 +91,14 @@ for(i in 1:nsims){
       mutate(coeff = paste0( coeff,".Nj"))%>%
       spread(coeff,Estimate) %>%
       mutate(com.comp.Nj.both = intercept.Nj + 100*time.Nj,
-             com.comp.prob.Nj.both = case_when(com.comp.Nj>0~T,
-                                          com.comp.Nj<0~F),
+             com.comp.prob.Nj.both = case_when(com.comp.Nj.both>0~T,
+                                          com.comp.Nj.both<0~F),
              sim = i,
              function.int = function.int)
     
     
-    df.glm <- right_join(df.Ni.glm,df.Nj.glm,
-                         df.Ni.both.glm,df.Nj.both.glm) %>%
+    df.glm <- right_join(df.Ni.glm,right_join(df.Nj.glm,
+                         right_join(df.Ni.both.glm,df.Nj.both.glm))) %>%
       mutate(com.comp.coex = case_when(mean(com.comp.Ni,com.comp.Ni.both) > 0 &
                                          mean(com.comp.Nj,com.comp.Nj.both) > 0 ~ "j_i",
                                        mean(com.comp.Ni,com.comp.Ni.both) <= 0 & 
@@ -114,16 +114,26 @@ for(i in 1:nsims){
 head(df.glm_all)
 str(df.glm_all)
 
-ggplot(df.glm_all,aes(x=time.Ni, 
-                      y=time.Nj,color=as.factor(function.int)))+ geom_point(alpha=0.5) + theme_bw() 
+com.comp.SLOPE<- ggplot(df.glm_all,aes(x=com.comp.coex,
+                      group=as.factor(function.int),
+                      fill=as.factor(function.int)))+ 
+  stat_count()+ theme_bw()  +
+  scale_fill_colorblind()
 
-ggsave(last_plot(),
+ggplot(df.glm_all,aes(x=time.Ni, 
+                      y=time.Nj,color=as.factor(function.int)))+ 
+  geom_point(alpha=0.5) + theme_bw() 
+
+
+ggsave(com.comp.SLOPE,
        file = "figures/com.comp.SLOPE.pdf")
 
 ##########################################################################################################
 # 2. Standardization
 ##########################################################################################################
-df.sim.std <- full_join(df.sim,df.glm_all)
+df.sim$sim <- df.sim$sim.i
+df.sim.std <- full_join(df.sim,df.glm_all,
+                        by=c("sim","function.int"))
 
 stand.variable <- c(paste0("Nmax",c(".i.j",".i.i",".j.i",".j.j")),
                     paste0("c",c(".i.j",".i.i",".j.i",".j.j")),
@@ -138,54 +148,59 @@ df.sim.std[,stand.variable] <- lapply(df.sim.std[,stand.variable],
 ##########################################################################################################
 
 # Incorporate interaction terms
+df.sim.std <-  df.sim.std %>%
+  mutate( com.comp.coex.int = case_when(com.comp.coex =="j_i" ~1,
+                                        TRUE ~ 0))
 
-
-model.0 <- glm(com.comp.coex ~ as.factor(function.int), 
-               data = df.sim.std[which(df.sim.std$prob.coex >= 0),],
+model.0 <- glm( com.comp.coex.int ~ as.factor(function.int), 
+               data = df.sim.std,
                family = "binomial")
 
-model.1 <- glm(formula(paste0("com.comp.coex  ~ ",
+model.1 <- glm(formula(paste0("com.comp.coex.int  ~ ",
                               paste(paste0("a_initial",c(".i.j",".i.i",".j.i",".j.j")),collapse = "+"))), 
-               data = subset(df.sim.std,function.int==1 & prob.coex >= 0),
+               data = df.sim.std[which(df.sim.std$function.int==1),],
                family = "binomial")
 
-model.2 <- glm(formula(paste0("com.comp.coex  ~ ",
+model.2 <- glm(formula(paste0("com.comp.coex.int   ~ ",
                               paste(c(paste0("Nmax",c(".i.j",".i.i",".j.i",".j.j")),
                                       paste0("a_initial",c(".i.j",".i.i",".j.i",".j.j")),
                                       paste0("a_slope",c(".i.j",".i.i",".j.i",".j.j"))),collapse = "+"))), 
-               data = subset(df.sim.std,function.int==2 & prob.coex >= 0),
+               data = df.sim.std[which(df.sim.std$function.int==2),],
                family = "binomial")
 
-model.3 <- glm(formula(paste0("com.comp.coex  ~ ",
+model.3 <- glm(formula(paste0("com.comp.coex.int  ~ ",
                               paste(stand.variable,collapse = "+"))), 
-               data = subset(df.sim.std,function.int==3 & prob.coex >= 0),
+               data = df.sim.std[which(df.sim.std$function.int==3),],
                family = "binomial")
 
-model.4 <- glm(formula(paste0("com.comp.coex  ~ ",
+model.4 <- glm(formula(paste0("com.comp.coex.int  ~ ",
                               paste(stand.variable,collapse = "+"))), 
-               data = subset(df.sim.std,function.int==4 & prob.coex >= 0),
+               data = df.sim.std[which(df.sim.std$function.int==4),],
                family = "binomial")
 
 # build dataframe to plot
-ggplot( df.sim.std, aes(x=com.comp.coex, 
+ggplot( df.sim.std, aes(x=com.comp.coex.int, 
                                  fill=as.factor(function.int)))+
   stat_count() +theme_bw()
 
 
-sens_out <- tidy(model.1) %>% 
-  mutate(function.int = 1) %>% 
+sens_out <- tidy(model.2) %>% 
+  mutate(function.int = 2) %>% 
   bind_rows(
     (tidy(model.0) %>%
        mutate(term = "function",
               function.int = c(1,2,3,4))),
-    (tidy(model.2) %>%
-       mutate(function.int = 2)),
+    #(tidy(model.1) %>%
+    #   mutate(function.int = 1)),
     (tidy(model.3) %>%
        mutate(function.int = 3)),
     (tidy(model.4) %>%
        mutate(function.int = 4))
   ) %>%
   filter(term != "(Intercept)")
+
+
+
 
 sens_out$term <- factor(sens_out$term, 
                         levels = 
@@ -254,7 +269,7 @@ df$lower <- df$lower / (1 + df$lower)
 
 # Plot probabilities
 
-ggplot(df, aes(function.int, prediction)) +
+prediction.Slopes <- ggplot(df, aes(function.int, prediction)) +
   geom_errorbar(aes(ymin = lower, ymax = upper), 
                 width = 0.25, size = 1, position = position_dodge(width = 0.4)) +
   geom_point(shape = 21, size = 3, 
@@ -263,3 +278,5 @@ ggplot(df, aes(function.int, prediction)) +
   scale_y_continuous(name = "Probability of coexistence", limits = c(0, 1),
                      labels = scales::percent)
 
+ggsave(prediction.Slopes,
+       "figures/prediction.Slopes.pdf")

@@ -24,7 +24,7 @@ library(ppcor) # partial correlation value
 source("code/PopProjection_toolbox.R")
 
 # define parameters
-nsims <- 1000
+nsims <- 500
 species <- 2
 function.int <- c(1:4)
 
@@ -94,7 +94,7 @@ for(i in 1:nsims){
          function.int) %>%# simulation of invasion for both species
       bind_cols(df.n) 
   
-    df.initc <- Ricker_solution_ODE(state = c(1,1), pars= p, gens=t.num*100,
+    df.initc <- Ricker_solution_ODE(state = c(1,1), pars= p, gens=t.num*10,
                         function.int) %>% # simulation of initial condition = 1,1
       mutate(invader = "both") %>%
       bind_cols(df.n) %>% 
@@ -117,24 +117,25 @@ write_csv(x = df.sim , col_names = TRUE,
 sim = 2
 t.num= 100
 #---- Abundance through time for all scenario----
-df.sim[which(df.sim$sim.i == sim &
+example.abundance.scenarios <- df.sim[which(df.sim$sim.i == sim &
                df.sim$function.int == 4),] %>%
   gather(Ni, Nj, key=species, value=abundance) %>%
   ggplot(aes(y=abundance, x=time)) + #geom_point() +
   geom_smooth(aes(y=abundance,color=species,fill=species),
               alpha=0.2,size=0.5, linetype="dashed") +
   geom_line(aes(y= abundance,color=species), alpha=0.8) +
-  theme_bw() + facet_wrap(as.factor(invader)~.) + 
+  xlim(c(0,100)) +
+  theme_bw() + facet_wrap(as.factor(invader)~., scales="free") + 
   scale_colour_colorblind() +
   scale_fill_colorblind() +
-  labs(title="abundances Ni and Nj over time when invading for function 1 and function 4")
+  labs(title="abundances Ni and Nj over time")
 
-ggsave(last_plot(),
+ggsave(example.abundance.scenarios,
        file = "figures/example.abundance.scenarios.pdf")
 
 #---- Abundance through time----
-df.sim[which(df.sim$sim.i == sim &
-               df.sim$invader = "both" &
+example.oscillatory.state <- df.sim[which(df.sim$sim.i == sim &
+               df.sim$invader == "both" &
                      (df.sim$function.int == 4 | 
                         df.sim$function.int == 1)),] %>%
   gather(Ni, Nj, key=species, value=abundance) %>%
@@ -142,12 +143,13 @@ df.sim[which(df.sim$sim.i == sim &
   geom_smooth(aes(y=abundance,color=species,fill=species),alpha=0.2,size=0.5, linetype="dashed") +
   geom_line(aes(y= abundance,color=species),alpha=0.8) +
   theme_bw() + facet_wrap(function.int~.) + 
-  geom_text(aes(label=grwrChesson, y= 7, x=75),color=rep(c("black",rep("NA",times=100)),times=8))+ 
   scale_colour_colorblind() +
+  xlim(c(0,100)) +
   scale_fill_colorblind() +
-  labs(title="abundances Ni and Nj over time when invading for function 1 and function 4")
+  labs(title="abundances Ni and Nj over time when 
+       Ni = Nj = 0 at t=0")
 
-ggsave(last_plot(),
+ggsave(example.oscillatory.state,
        file = "figures/example.oscillatory.state.pdf")
 
 #---- GR through time----
@@ -158,65 +160,82 @@ for(function.int in c(1:4)){
   par.dat <- params[[sim]]
 
 GRWR.list[[function.int]] <- df.sim[which(df.sim$sim.i == 20 &
-                                            df.sim$invader = "both" &
+                                            df.sim$invader == "both" &
                                             df.sim$function.int == function.int),] %>%
   gather(dNi, dNj, key=species, value=GR) %>%
-  ggplot(aes(y=GR, x=time))  + 
+  ggplot(aes(y=GR, x=time))  +
+  xlim(c(0,100)) + 
   geom_line(aes(y=GR,color=species),alpha=0.7,size=1)  + 
-  geom_point(aes(y=coex,color=col.coex ),shape=1,size= rep(c(1,2,rep(1,each=99)),time=2)) + 
   geom_vline(aes(xintercept=1),linetype="dashed",color="black",alpha=0.7) +
   theme_bw() + scale_colour_colorblind() +
-  guides(alpha="none")+
+  guides(alpha="none") +
   labs(title=paste0("GRWR at each time step for Ni and Nj \n for sim ",sim," and function ",function.int)) 
 }
-ggarrange(plotlist = GRWR.list, ncol=2, nrow=2,common.legend = T,
+example.GR.all.timesteps <- ggarrange(plotlist = GRWR.list, ncol=2, nrow=2,common.legend = T,
           legend = "right")
 
-ggsave(last_plot(),
+ggsave(example.GR.all.timesteps,
        file = "figures/example.GR.all.timesteps.pdf")
 
 #---- Ni dependency on Nj ----
-df.sim[which(df.sim$sim.i == sim &
-               df.sim$invader = "both"),]  %>%
+NINJ.list <- list()
+
+for(function.int in c(1:4)){
+  par.dat <- params[[sim]]
+  
+  NINJ.list[[function.int]] <- df.sim[which(df.sim$sim.i == sim &
+               df.sim$invader == "both" &
+               df.sim$function.int == function.int ),]  %>%
   ggplot(aes(Ni, Nj)) + 
   geom_path(aes(colour = as.numeric(time))) +
   facet_wrap(function.int~.) + 
-  theme_bw() 
+  theme_bw() +
+ labs(title=paste0("Abundance at each time step 
+ for Ni and Nj \n 
+ for sim ",sim,
+                   " and function ",function.int)) 
+  
 
-ggsave(last_plot(),
+}
+example.oscillatory.state.of.abundances <- ggarrange(plotlist =   NINJ.list, ncol=2, nrow=2,common.legend = T,
+          legend = "right")
+
+
+ggsave(example.oscillatory.state.of.abundances,
        file = "figures/example.oscillatory.state.of.abundances.pdf")
 
 #---- GR of Ni dependency on GR of Nj ----
 
-df.sim[which(df.sim$sim.i == sim &
-               df.sim$invader = "both"),]  %>%
+example.oscillatory.state.of.GR <- df.sim[which(df.sim$sim.i == sim &
+               df.sim$invader == "both" &
+               df.sim$function.int == function.int),]  %>%
   ggplot(aes(dNi, dNj)) + 
   geom_path(aes(colour = as.numeric(time))) +
   facet_wrap(function.int~.) + 
   theme_bw() 
 
-ggsave(last_plot(),
+ggsave(example.oscillatory.state.of.GR,
        file = "figures/example.oscillatory.state.of.GR.pdf")
 
-ggarrange( ncol=2, nrow=1,
+example.oscillatory.boundaries <- ggarrange( ncol=2, nrow=1,
 df.sim[which(df.sim$sim.i == sim &
-               df.sim$invader = "both"),]  %>%
+               df.sim$invader == "both"),]  %>%
   mutate(Nj2 = c(Nj[-1],NA))%>%
   ggplot(aes(Nj, Nj2)) + 
   geom_path(aes(colour = as.numeric(time))) +
-  facet_wrap(function.int~.) + 
+  facet_wrap(function.int~., scales="free") + 
   labs(title="Nj boundaries", x= "N(t+1)", y = " N(t)") +
   theme_bw(),
 df.sim[which(df.sim$sim.i == sim &
-               df.sim$invader = "both"),]  %>%
+               df.sim$invader == "both"),]  %>%
   mutate(Ni2 = c(Ni[-1],NA)) %>%
   ggplot(aes(Ni, Ni2)) + 
   geom_path(aes(colour = as.numeric(time))) +
-  facet_wrap(function.int~.) +
+  facet_wrap(function.int~., scales="free") +
   labs(title="Ni boundaries", x= "N(t+1)", y = " N(t)") +
   theme_bw() 
 )
 
-ggsave(last_plot(),
+ggsave(example.oscillatory.boundaries,
        file = "figures/example.oscillatory.boundaries.pdf")
 
