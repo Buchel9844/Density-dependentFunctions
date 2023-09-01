@@ -94,7 +94,7 @@ for(i in 1:nsims){
          function.int) %>%# simulation of invasion for both species
       bind_cols(df.n) 
   
-    df.initc <- Ricker_solution_ODE(state = c(1,1), pars= p, gens=t.num*10,
+    df.initc <- Ricker_solution(state = c(1,1), pars= p, gens=t.num*10,
                         function.int) %>% # simulation of initial condition = 1,1
       mutate(invader = "both") %>%
       bind_cols(df.n) %>% 
@@ -107,18 +107,18 @@ for(i in 1:nsims){
 
 # save .csv
 
-write_csv(x = df.sim , col_names = TRUE, 
+save( df.sim , col_names = TRUE, 
           file = paste0("results/df.sim.csv.gz"))
-
+load("results/df.sim.csv.gz")
 
 ##########################################################################################################
 # 2. Visualise population dynamics
 ##########################################################################################################
-sim = 2
+sim = 14
 t.num= 100
 #---- Abundance through time for all scenario----
 example.abundance.scenarios <- df.sim[which(df.sim$sim.i == sim &
-               df.sim$function.int == 4),] %>%
+               df.sim$function.int == 1),] %>%
   gather(Ni, Nj, key=species, value=abundance) %>%
   ggplot(aes(y=abundance, x=time)) + #geom_point() +
   geom_smooth(aes(y=abundance,color=species,fill=species),

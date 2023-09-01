@@ -123,6 +123,64 @@ Ricker_solution<- function(gens,
   return(df)
 }
 
+Ricker_solution_NatData <- function(gens,
+                                   state,
+                                   pars) {
+  function.int <- pars$function.int[1]
+  Nmax <- pars$Nmax # density at which fecundity is max - effect of neighbors is 0
+  g <- pars$g # germination rate 
+  s <- pars$s #seed survival
+  lambda <- pars$lambda # intrinsic growth rate
+  a_initial <- pars$alpha_init # which int.function
+  a_slope <- pars$alpha_slope # which int.function
+  c <- pars$alpha_c # which int.function
+  neigh <- levels(as.factor(pars$neigh)) # number of neighbours
+  n.neigh <- length(neigh) 
+  focal <- levels(as.factor(pars$focal)) # number of focal
+  n.focal <- length(focal)
+  position <- c(!neigh %in% focal)
+  
+  
+  position.df <- 1:n.focal*n.neigh # position of parameter for each focal in the data.frame
+  
+  df <- data.frame(matrix(data= rep(NA,each=(1+gens)*n.neigh),
+                          ncol=n.neigh, nrow=1+gens))
+  names(df) <- c(paste0("N",1:n.neigh))
+  df[1,] <- rep(state,each=n.neigh) #species i initial densities
+  df[,position] <- 1
+
+  for(t in 1:gens){
+    Nt1 <- c()
+    Nt <- df[t,!position]  # species i densities
+    for( n in 1:n.focal){
+      low= position.df[n]-(n.neigh - 1)
+      up = position.df[n]
+    if(function.int==1){
+      a <- a_initial[low:up]
+    }
+    if(function.int==2){
+      a <- alpha_function2(a_initial[low:up], a_slope[low:up],g*Nt, Nmax[low:up])
+    }
+    if(function.int==3){
+      a <- alpha_function3(a_initial[low:up], a_slope[low:up],c[low:up],g*Nt, Nmax[low:up])
+    }
+    if(function.int==4){
+      a <- alpha_function4(a_initial[low:up], a_slope[low:up],c[low:up],g*Nt, Nmax[low:up])
+    }
+  
+    Fec[n] <-  exp(lambda[position.df[n]] + sum(a*g*Nt))
+    
+    
+    Nt1[n] <- ((1-g) * s + g* Fec[n])*Nt[n]
+    
+    }
+    df[t+1,!position] <- c(Nt1)
+
+  }
+  names(df) <- c(neigh)
+  df$time <- c(0:gens) 
+  return(df)
+}
 
 Ricker_solution_mono <- function(gens,
                                  state,
