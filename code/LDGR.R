@@ -18,7 +18,7 @@ library(tsvr) # library for the timescale specific variance ratio
 
 library(ppcor) # partial correlation value
 
- # for ##########################################################################################################
+###########################################################################################################
 # 1. Compute Low- Density Growth Rates for wide range of parameters
 ##########################################################################################################
 source("code/PopProjection_toolbox.R")
@@ -106,15 +106,16 @@ for(i in 1:nsims){
 }
 
 # save .csv
-
-save( df.sim , col_names = TRUE, 
+library(data.table)
+write.csv(df.sim , 
           file = paste0("results/df.sim.csv.gz"))
 load("results/df.sim.csv.gz")
-
+df.sim = fread("results/df.sim.csv.gz")
+head(df.sim)
 ##########################################################################################################
 # 2. Visualise population dynamics
 ##########################################################################################################
-sim = 14
+sim = 25
 t.num= 100
 #---- Abundance through time for all scenario----
 example.abundance.scenarios <- df.sim[which(df.sim$sim.i == sim &
@@ -238,4 +239,6 @@ df.sim[which(df.sim$sim.i == sim &
 
 ggsave(example.oscillatory.boundaries,
        file = "figures/example.oscillatory.boundaries.pdf")
+
+
 

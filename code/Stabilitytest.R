@@ -14,9 +14,8 @@ library(wesanderson)
 df.stability <- df.sim.std[which(df.sim.std$invader =="both"),]
  
  summary.df.stability <- NULL
- nsims <- 1000
+ nsims <- 500
  t.num = 100 # number of generation
-
  df.stability.summary <- NULL
  for(i in 1:nsims){
    for( function.int in 1:4){
@@ -25,8 +24,7 @@ df.stability <- df.sim.std[which(df.sim.std$invader =="both"),]
                                            df.stability$function.int == function.int),]
  
    df.stability.n <- df.stability.n[c(10:t.num*10),] # burn first 10 generations
- 
- 
+  
 #Mean  over time   
    mean.i=c(mean(df.stability.n$Ni))
    mean.j=c(mean(df.stability.n$Nj))
@@ -34,26 +32,37 @@ df.stability <- df.sim.std[which(df.sim.std$invader =="both"),]
  #Mean Variance over time
  # Plaza et al,2012 https://doi.org/10.1111/j.1654-1103.2011.01381.x
  #  amplitude of population fluctuations by means of the standard deviation
+   # ratio between median and interquantile
+   if(exists("stability.significance")){rm("stability.significance")}
+   
+   if(!is.na( mean.i) & !is.na( mean.j)){
+   ratio_i <- median(df.stability.n$Ni,na.rm=T)/IQR(df.stability.n$Ni,na.rm=T) 
+   ratio_j <- median(df.stability.n$Nj,na.rm=T)/IQR(df.stability.n$Nj,na.rm=T)
+   
       msdi <- sd(log10(df.stability.n$Ni))
       msdj <- sd(log10(df.stability.n$Nj))
-      if(exists("stability.significance")){rm("stability.significance")}
       
-      if((msdi< 0.05 | msdj < 0.05 | is.na(msdi)| is.na(msdj) ) &
-         (mean.i==0|mean.j==0| is.na(mean.i)| is.na(mean.j) )){
-        stability.significance = "extinction"
-      }else{
-         if((msdi< 0.05 | msdj < 0.05 | is.na(msdi)| is.na(msdj)) & 
-        ( mean.i!=0|mean.j!=0| !is.na(mean.i)| !is.na(mean.j) )){
-        stability.significance = "half.stable"
-         }
-      }
-     if(msdi < 0.05 & msdj < 0.05 & !is.na(msdi) & !is.na(msdj) &
-         mean.i!=0 & mean.j!=0){
+
+    if(!is.na(ratio_j) & !is.na(ratio_i)){
+     if(is.infinite(ratio_i) & is.infinite(ratio_j) ){
         stability.significance = "stable"
-      }
+         }else{if( ratio_i > 1 & ratio_j > 1){
+           stability.significance = "stable"
+               }else{if( ratio_i > 1 | ratio_j > 1){
+                 stability.significance = "half-stable"
+                      }else{stability.significance = "extinction"
+                            }
+                    }
+              }
+        }
+    }
       if(!exists("stability.significance")){
         stability.significance = "no"
-      }
+        ratio_i <- NA
+        ratio_j <- NA
+        msdi <- NA
+        msdj <- NA
+       }
 #ARIMA is the abbreviation for AutoRegressive Integrated Moving Average.      
       #for j
       if(exists(c("p.j"))|exists(c("p.i"))){rm(p.j,q.j,p.i,q.i)}
@@ -189,6 +198,8 @@ df.stability <- df.sim.std[which(df.sim.std$invader =="both"),]
                                      mean.j=c(mean(df.stability.n$Nj)),
                                      msd.i = c(msdi),
                                      msd.j = c(msdj),
+                                     ratio.i = c(ratio_i),
+                                     ratio.j = c(ratio_j),
                                      oscillation.significance =   oscillation.significance, 
                                      stability.significance = stability.significance,
                                      correlation.estimate=correlation.estimate,
@@ -212,9 +223,10 @@ load("results/df.stability.summary.csv.gz")
 #---- global visualisation -----
 df.sim.std.small[which(df.sim.std.small$significance==""),]
 df.sim.std.small <- df.sim.std[which(df.sim.std$invader == "both" &
-                                       df.sim.std$time == 1 &
-                                       (df.sim.std$function.int == 1| 
-                                          df.sim.std$function.int == 4)),] %>%
+                                       df.sim.std$time == 1 #&
+                                       #(df.sim.std$function.int == 1| 
+                                       #   df.sim.std$function.int == 4)
+                                     ),] %>%
   dplyr::select(c("sim","function.int","com.comp.coex", "com.comp.coex.int")) %>%
   left_join(df.stability.summary[,c("sim","function.int","correlation.significance", "synchrony.significance",
                                     "stability.significance","oscillation.significance")], 
@@ -226,16 +238,24 @@ df.sim.std.small <- df.sim.std[which(df.sim.std$invader == "both" &
 
 df.sim.std.small[df.sim.std.small =="no"] <- NA
 
-df.sim.std.small$significance <-factor(apply(df.sim.std.small[, c("synchrony.significance",
+df.sim.std.small$significance <- apply(df.sim.std.small[, c("synchrony.significance",
                                               "stability.significance","oscillation.significance")],
-                         1, function(x) toString(na.omit(x))),
-                         levels=c("",
-                                  "extinction","half.stable","stable",
-                                  "half_oscillation", "oscillation",              
-                                  "synchrony","synchrony, extinction",      
-                                  "synchrony, half_oscillation", "synchrony, oscillation"))
-  
+                         1, function(x) toString(na.omit(x)))
+df.sim.std.small <- df.sim.std.small %>%
+  mutate(significance = case_when(significance == "synchrony, extinction"|
+                                    significance == "synchrony, extinction, half_oscillation"|
+                                     significance == "synchrony, extinction, oscillation" ~ "extinction",
+                                  #significance == "synchrony, half-stable oscillation"|
+                                 #   significance == "synchrony, half-stable oscillation, half_oscillation"|
+                                 #   significance == "synchrony, half-stable oscillation, oscillation" ~ "synchrony, half-stable oscillation",
+                                #  significance == "synchrony, stable oscillation, half_oscillation"~ "synchrony, stable oscillation",
+                                 # significance == "half-stable oscillation, half_oscillation" ~ "half-stable oscillation",
+                                 # significance == "stable oscillation, oscillation" ~ "stable oscillation",
+                                  TRUE ~ significance
+                                  ))
+
 levels(as.factor(df.sim.std.small$significance))
+  df.sim.std.small[which(is.na(df.sim.std.small$significance)),]
 
 safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
                              "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
@@ -244,7 +264,7 @@ safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#33228
 summary.stability.plot <-  ggplot(df.sim.std.small, aes(x=as.factor(com.comp.coex),
                                                         fill=as.factor(significance))) + 
   geom_bar_pattern(aes(pattern=as.factor(com.comp.coex.int)),
-                   position = "dodge",
+                   position = "stack",
                    stat= "count",
                    color = "black",
                    pattern_angle =45,
@@ -252,18 +272,19 @@ summary.stability.plot <-  ggplot(df.sim.std.small, aes(x=as.factor(com.comp.coe
                    pattern_spacing = 0.025,
                    pattern_key_scale_factor = 1,
                    na.rm=T) +  
-  scale_fill_manual(values= c("#888888",
-                               "#661100","#CC6677","#AA4499",
+  scale_fill_manual(values=  c("#888888",
+                               "#661100","#CC6677","#882255","#AA4499",
                                "#999933",  "#117733",              
                                "#332288","#88CCEE",      
-                               "#6699CC", "#44AA99")) +
+                               "#6699CC", "#44AA99",
+                               "#DDCC77")) +
   scale_pattern_manual(values=c("stripe","none"),
                        labels=c("Less than 2 species","2 species")) +
   labs(title ="Percentage of community predicted to have both species in community with underlying dynamics",
       subtitle = " initial intraspecific interactions > initial interspecific community",
       pattern= "Community composition",
       fill = "Community dynamics") + 
-  facet_wrap(function.int~., ncol=2, nrow=2,scales="free_x") +
+  facet_wrap(function.int~., ncol=2, nrow=2) +
   theme(panel.background = element_blank(),
         legend.key.size = unit(1, 'cm')) 
   #theme_bw()
@@ -272,34 +293,12 @@ summary.stability.plot
 
 ggsave(summary.stability.plot, 
        file = "figures/summary.stability.plot.pdf")
-values= c(""="#888888",
-          "extinction"="#661100","half.stable"="#CC6677","stable"="#AA4499",
-          "half_oscillation"="#999933", "oscillation"= "#117733",              
-          "synchrony"="#332288","synchrony, extinction"="#88CCEE",      
-          "synchrony, half_oscillation"="#6699CC", "synchrony, oscillation"="#44AA99"))
+#values= c(""="#888888",
+#          "extinction"="#661100","half.stable"="#CC6677","stable"="#AA4499",
+#          "half_oscillation"="#999933", "oscillation"= "#117733",              
+#          "synchrony"="#332288","synchrony, extinction"="#88CCEE",      
+#          "synchrony, half_oscillation"="#6699CC", "synchrony, oscillation"="#44AA99"))
 
-scale_pattern_manual(values = c("no" = "none", 
-                                "synchrony"= "crosshatch","corr" = 'crosshatch',
-                                "oscillation"='wave',"half_oscillation"='wave',
-                                "stable"= 'stripe',"half.stable"= 'stripe',"extinction" = 'stripe'),
-                     labels = c("corr" ="Correlated abundances","Extinction",
-                                "half_oscillation"="One species oscillation",
-                                "half.stable"="One species is stable",
-                                "no" ="other",
-                                "oscillation"="Both oscillation",
-                                "stable"= "Two species stability",
-                                "synchrony"="Synchrony of species"))
-geom_bar_pattern(aes(pattern=as.factor(significance),
-                     pattern_density= as.factor(significance),
-                     pattern_angle = as.factor(significance)
-),
-position = "dodge",
-stat= "count",
-color = "black",
-pattern_density = 0.2,
-pattern_spacing = 0.025,
-pattern_key_scale_factor = 1,
-na.rm=T)
 #---- detailed visualisation -----
 df.stability.summary <- df.stability.summary
 df.stability.summary %>%

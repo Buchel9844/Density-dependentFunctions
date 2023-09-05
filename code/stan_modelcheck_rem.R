@@ -137,7 +137,7 @@ stan_post_pred_check_all <- function(post.draws,
                                  main,
                                  col1,
                                  col2,
-                                 value.se,
+                                 #value.se,
                                  ...) {
   
   # currently using the loo package, can switch to rethinking
@@ -175,9 +175,9 @@ stan_post_pred_check_all <- function(post.draws,
   }
   # add the actual data
   ppc.plot <- lines(density(stan.data), col = col1, lwd = 2)  
-  ppc.plot <- text(labels = value.se, 
-                   y= max.density - max.density/10, x=max(stan.data)- max(stan.data)/10,
-                   cex=1, pos=3,col="black")
+  #ppc.plot <- text(labels = value.se, 
+  #                 y= max.density - max.density/10, x=max(stan.data)- max(stan.data)/10,
+  #                 cex=1, pos=3,col="black")
   print(ppc.plot)
 }
 

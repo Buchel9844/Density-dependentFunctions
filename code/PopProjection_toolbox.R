@@ -151,6 +151,7 @@ Ricker_solution_NatData <- function(gens,
 
   for(t in 1:gens){
     Nt1 <- c()
+    Fec <- c()
     Nt <- df[t,!position]  # species i densities
     for( n in 1:n.focal){
       low= position.df[n]-(n.neigh - 1)

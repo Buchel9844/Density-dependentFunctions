@@ -141,6 +141,9 @@ str(df.glm_all)
 save(df.glm_all,
      file="results/df.glm_all.csv.gz")
 
+load("results/df.glm_all.csv.gz")
+
+
 com.comp.SLOPE <- ggplot(df.glm_all,aes(x=com.comp.coex,
                       group=as.factor(function.int),
                       fill=as.factor(function.int)))+ 
