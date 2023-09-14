@@ -15,7 +15,7 @@ library(bbmle)
 library(reshape2)
 library(ggthemes)
 library(tsvr) # library for the timescale specific variance ratio
-
+library(data.table) # write csv.gz
 library(ppcor) # partial correlation value
 
 ###########################################################################################################
@@ -27,7 +27,8 @@ source("code/PopProjection_toolbox.R")
 nsims <- 500
 species <- 2
 function.int <- c(1:4)
-
+t.num = 100
+gen = seq(from=0, to=t.num , by=1)
 # run sim
 set.seed(1608)
 
@@ -64,7 +65,9 @@ for( i in 1:nsims){
                     c =matrix(ncol=species, nrow = species, # a_slope, only positive values
                                      data = rtruncnorm(n=species*species, a=0, b=1, mean=0, sd=1),
                               dimnames = list(c("i", "j"),
-                                              c("i", "j")))
+                                              c("i", "j"))),
+                    e = sin((2*pi/20)*gen)*abs(rnorm(1,mean=0, sd=0.01))
+            
                     )
     if(params[[i]]$a_initial[1,1]*params[[i]]$a_initial[2,2] < 
        params[[i]]$a_initial[1,2]*params[[i]]$a_initial[2,1]){
@@ -81,9 +84,9 @@ for(i in 1:nsims){
     print(paste0("int ", i,"for funct ",function.int))
     df.n <- NULL
     p <- params[[i]]
-    df.n <- as.data.frame(params[[i]]) %>%
+    df.n <- as.data.frame(params[[i]][c("sim","Nmax","a_slope","a_initial","c")]) %>%
       mutate(focal = c("i","j"))  %>%
-      melt(id.vars="focal")   %>%
+      reshape2::melt(id.vars="focal")   %>%
       mutate( vars = paste(variable ,focal,sep=".")) %>%
       dplyr::select( value, vars) %>%
       spread(key=vars, value=value) %>%
@@ -94,7 +97,7 @@ for(i in 1:nsims){
          function.int) %>%# simulation of invasion for both species
       bind_cols(df.n) 
   
-    df.initc <- Ricker_solution(state = c(1,1), pars= p, gens=t.num*10,
+    df.initc <- Ricker_solution(state = c(1,1), pars= p, gens=t.num,
                         function.int) %>% # simulation of initial condition = 1,1
       mutate(invader = "both") %>%
       bind_cols(df.n) %>% 
@@ -106,7 +109,7 @@ for(i in 1:nsims){
 }
 
 # save .csv
-library(data.table)
+
 write.csv(df.sim , 
           file = paste0("results/df.sim.csv.gz"))
 load("results/df.sim.csv.gz")
@@ -115,22 +118,23 @@ head(df.sim)
 ##########################################################################################################
 # 2. Visualise population dynamics
 ##########################################################################################################
-sim = 25
+sim = 2
 t.num= 100
 #---- Abundance through time for all scenario----
+
 example.abundance.scenarios <- df.sim[which(df.sim$sim.i == sim &
-               df.sim$function.int == 1),] %>%
+               df.sim$function.int == 4),] %>%
   gather(Ni, Nj, key=species, value=abundance) %>%
   ggplot(aes(y=abundance, x=time)) + #geom_point() +
   geom_smooth(aes(y=abundance,color=species,fill=species),
-              alpha=0.2,size=0.5, linetype="dashed") +
+              alpha=0.2,linewidth=0.5, linetype="dashed") +
   geom_line(aes(y= abundance,color=species), alpha=0.8) +
   xlim(c(0,100)) +
   theme_bw() + facet_wrap(as.factor(invader)~., scales="free") + 
   scale_colour_colorblind() +
   scale_fill_colorblind() +
   labs(title="abundances Ni and Nj over time")
-
+example.abundance.scenarios
 ggsave(example.abundance.scenarios,
        file = "figures/example.abundance.scenarios.pdf")
 
@@ -141,15 +145,30 @@ example.oscillatory.state <- df.sim[which(df.sim$sim.i == sim &
                         df.sim$function.int == 1)),] %>%
   gather(Ni, Nj, key=species, value=abundance) %>%
   ggplot(aes(y=abundance, x=time)) + #geom_point() +
-  geom_smooth(aes(y=abundance,color=species,fill=species),alpha=0.2,size=0.5, linetype="dashed") +
+  geom_smooth(aes(y=abundance,color=species,fill=species),
+              alpha=0.2,size=0.5, linetype="dashed") +
   geom_line(aes(y= abundance,color=species),alpha=0.8) +
-  theme_bw() + facet_wrap(function.int~.) + 
+  theme_bw() + facet_wrap(function.int~.,scales="free") + 
+  scale_colour_colorblind() +
+  xlim(c(0,100)) +
+  scale_fill_colorblind() +
+  labs(title="abundances Ni and Nj over time when 
+       Ni = Nj = 0 at t=0")
+example.oscillatory.state <- df.sim[which(df.sim$sim.i == sim &
+                                            df.sim$invader == "both"),] %>%
+  gather(Ni, Nj, key=species, value=abundance) %>%
+  ggplot(aes(y=abundance, x=time)) + #geom_point() +
+  geom_smooth(aes(y=abundance,color=species,fill=species),
+              alpha=0.2,size=0.5, linetype="dashed") +
+  geom_line(aes(y= abundance,color=species),alpha=0.8) +
+  theme_bw() + facet_wrap(function.int~.,scales="free") + 
   scale_colour_colorblind() +
   xlim(c(0,100)) +
   scale_fill_colorblind() +
   labs(title="abundances Ni and Nj over time when 
        Ni = Nj = 0 at t=0")
 
+example.oscillatory.state
 ggsave(example.oscillatory.state,
        file = "figures/example.oscillatory.state.pdf")
 

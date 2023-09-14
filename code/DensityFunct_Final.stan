@@ -41,12 +41,16 @@ transformed parameters{
   matrix[N,S] alpha_function_eij;
   matrix[N,S] alpha_value;
   vector[N] lambda_ei;
+  vector[S] alpha_slope_ei;
+  vector[S] c_ei;
   
   // implement the biological model
   for(i in 1:N){
     lambda_ei[i] = U*lambdas[1];
-
     for(s in 1:S){
+    //scaling factor
+    alpha_slope_ei[s] = alpha_slope[s] - 0.5; //scaling to have higher values
+    c_ei[s] = c[s] + 0.5;
       if(alphaFunct1 ==1){
       alpha_value[i,s]= alpha_initial[s];
       alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
@@ -75,9 +79,9 @@ transformed parameters{
 model{
   // set regular priors
   alpha_initial ~ normal(0,1);
-  alpha_slope ~ normal(0,1);
+  alpha_slope ~ normal(0,0.5);
   lambdas ~ normal(0,1);
-  c ~ normal(0, 1);
+  c ~ normal(0, 0.5);
   disp_dev ~ cauchy(0, 1);  // safer to place prior on disp_dev than on phi
   
 

@@ -1,5 +1,5 @@
 ##########################################################################################################
-# Compute slopes of growth over time
+# 1. Compute slopes of growth over time
 ##########################################################################################################
 
 load("results/df.sim.csv.gz")
@@ -28,8 +28,8 @@ for(i in 1:nsims){
       rownames_to_column(var="coeff") %>%
       mutate(coeff = case_when(coeff =="(Intercept)" ~ "intercept",
                                coeff =="time"~"time")) %>%
-      select(coeff,Estimate ) %>%
-      mutate(coeff = paste0( coeff,".Ni"))%>%
+      dplyr::select(coeff,Estimate ) %>%
+      mutate(coeff = paste0( coeff,".Ni")) %>%
       spread(coeff,Estimate) %>%
       mutate(com.comp.Ni = mean(intercept.Ni + 100*time.Ni),
              com.comp.prob.Ni = case_when(com.comp.Ni>0~T,
@@ -55,7 +55,7 @@ for(i in 1:nsims){
       rownames_to_column(var="coeff") %>%
       mutate(coeff = case_when(coeff =="(Intercept)" ~ "intercept",
                                coeff =="time"~"time")) %>%
-      select(coeff,Estimate ) %>%
+      dplyr::select(coeff,Estimate ) %>%
       mutate(coeff = paste0( coeff,".Nj"))%>%
       spread(coeff,Estimate) %>%
       mutate(com.comp.Nj = mean(intercept.Nj + 100*time.Nj),
@@ -82,7 +82,7 @@ for(i in 1:nsims){
       rownames_to_column(var="coeff") %>%
       mutate(coeff = case_when(coeff =="(Intercept)" ~ "intercept",
                                coeff =="time"~"time")) %>%
-      select(coeff,Estimate ) %>%
+      dplyr::select(coeff,Estimate ) %>%
       mutate(coeff = paste0( coeff,".Ni.both"))%>%
       spread(coeff,Estimate) %>%
       mutate(com.comp.Ni.both = mean(intercept.Ni.both + 100*time.Ni.both),
@@ -109,7 +109,7 @@ for(i in 1:nsims){
       rownames_to_column(var="coeff") %>%
       mutate(coeff = case_when(coeff =="(Intercept)" ~ "intercept",
                                coeff =="time"~"time")) %>%
-      select(coeff,Estimate ) %>%
+      dplyr::select(coeff,Estimate ) %>%
       mutate(coeff = paste0( coeff,".Nj.both"))%>%
       spread(coeff,Estimate) %>%
       mutate(com.comp.Nj.both = mean(intercept.Nj.both + 100*time.Nj.both),
@@ -121,7 +121,7 @@ for(i in 1:nsims){
     }
     df.glm <- full_join(full_join(df.Ni.glm,df.Nj.glm),
                          full_join(df.Ni.both.glm,df.Nj.both.glm)) %>%
-      mutate(com.comp.coex = case_when(mean(com.comp.Ni,com.comp.Ni.both) > 0 &
+      mutate(com.comp.SLOPE = case_when(mean(com.comp.Ni,com.comp.Ni.both) > 0 &
                                          mean(com.comp.Nj,com.comp.Nj.both) > 0 ~ "j_i",
                                        mean(com.comp.Ni,com.comp.Ni.both) <= 0 & 
                                          mean(com.comp.Nj,com.comp.Nj.both) > 0 ~ "j",
@@ -134,7 +134,7 @@ for(i in 1:nsims){
   }
 }
 
-df.glm_all[which(is.na(df.glm_all$com.comp.coex)),"com.comp.coex"] <- 0
+df.glm_all[which(is.na(df.glm_all$com.comp.SLOPE)),"com.comp.coex"] <- 0
 head(df.glm_all)
 str(df.glm_all)
 
@@ -144,26 +144,192 @@ save(df.glm_all,
 load("results/df.glm_all.csv.gz")
 
 
-com.comp.SLOPE <- ggplot(df.glm_all,aes(x=com.comp.coex,
+plot_com.comp.SLOPE <- ggplot(df.glm_all,aes(x=com.comp.SLOPE,
                       group=as.factor(function.int),
                       fill=as.factor(function.int)))+ 
   stat_count()+ theme_bw()  +
-  scale_fill_colorblind()
-com.comp.SLOPE
+  scale_fill_colorblind() + 
+  labs(title ="Community composition based on mean slope")
+plot_com.comp.SLOPE
  
-ggsave(com.comp.SLOPE,
+ggsave(plot_com.comp.SLOPE,
        file = "figures/com.comp.SLOPE.pdf")
 
 ##########################################################################################################
-# 2. Standardization
+# 2. Compute minimal growth rate
+##########################################################################################################
+
+load("results/df.sim.csv.gz")
+
+closest<-function(xv,sv){ # function to find the value in a vector closest to a value 
+  xv[which(abs(xv-sv)==min(abs(xv-sv)))]
+}
+
+df.GRWL <- NULL
+
+
+for(i in 1:nsims){
+  for( function.int in 1:4){
+    print(paste0("int ", i,"for funct ",function.int))
+    
+    # Slope of Ni with init.cond= c(1,Nj*)
+    df.GRWL_n <- df.sim[which(df.sim$sim.i == i &
+                            df.sim$function.int == function.int),] %>%
+      select(-invader) %>%
+      mutate_if(is.character,as.numeric)
+    
+    lower.quantile_i = quantile(df.GRWL_n$Ni, 0.05, na.rm=T)
+
+    GRWL_i <- df.GRWL_n$dNi[which(df.GRWL_n$Ni == closest(df.GRWL_n$Ni,lower.quantile_i))]
+    GRWL_i <- min(GRWL_i[which(GRWL_i>=0)])
+    
+    if(is.na(GRWL_i)){
+      GRWL_i = 0
+    }
+    
+    lower.quantile_j = quantile(df.GRWL_n$Nj, 0.05, na.rm=T)
+    GRWL_j <- df.GRWL_n$dNj[which(df.GRWL_n$Nj ==closest(df.GRWL_n$Nj,lower.quantile_j))]
+    GRWL_j <- min(GRWL_j[which(GRWL_j>=0)])
+    
+    if(is.na(GRWL_j)){
+      GRWL_j = 0
+    }
+    
+    df.GRWL_n <- df.GRWL_n[1,] %>%
+      mutate(GRWL_i=GRWL_i,
+             GRWL_j=GRWL_j,
+             com.comp.GRWL = case_when(GRWL_i > 0 & GRWL_j > 0 ~"j_i",
+                                       GRWL_i > 0 & GRWL_j <= 0 ~"i",
+                                       GRWL_i <= 0 & GRWL_j > 0 ~"j",
+                                       GRWL_i <= 0 & GRWL_j <= 0 ~"0")
+               
+             )
+    df.GRWL <- bind_rows(df.GRWL,df.GRWL_n)
+    }
+}
+  
+plot_com.comp.GRWL <- ggplot(df.GRWL,aes(x=com.comp.GRWL,
+                                        group=as.factor(function.int),
+                                        fill=as.factor(function.int)))+ 
+  stat_count()+ theme_bw()  +
+  scale_fill_colorblind() +
+  labs(title ="Community composition based on GRWlow")
+plot_com.comp.GRWL
+
+ggsave(plot_com.comp.GRWL,
+       file = "figures/com.comp.GRWL.pdf")
+
+#join both methods of community composition
+df.GRWL$sim <- df.GRWL$sim.i
+plot_com.comp <- full_join(df.GRWL,df.glm_all) %>%
+  gather(com.comp.GRWL,com.comp.coex, key="com.comp.int",value="com.comp.id") %>%
+  ggplot(com.comp,aes(x=com.comp.id, group=as.factor(function.int),
+                    fill=as.factor(function.int)))+ 
+  stat_count() +
+  scale_fill_colorblind() +
+  facet_grid(.~com.comp.int) +
+  theme_bw()
+
+ggsave(plot_com.comp,
+       file = "figures/com.comp.pdf")
+
+plot_heatmap_ainit_aslope <- full_join(df.GRWL,df.glm_all) %>%
+  gather(com.comp.GRWL,com.comp.SLOPE, key="com.comp.int",value="com.comp.id") %>%
+  gather(a_initial.i.i,a_initial.i.j,a_initial.j.i,a_initial.j.j, 
+         key="parameter_a_initial",value="a_initial") %>%
+  gather(a_slope.i.i,a_slope.i.j,a_slope.j.i,a_slope.j.j, 
+         key="parameter_a_slope",value="a_slope") %>%
+  mutate(a_slope = case_when(function.int==1~0,
+                             T~a_slope)) %>%
+  ggplot(aes(x=a_slope,y=a_initial,
+                      color=as.factor(com.comp.id)))+ 
+  geom_point(alpha=0.5) +
+  scale_color_manual(values=safe_colorblind_palette) +
+  facet_grid(com.comp.int~function.int, scales="free") +
+  theme_bw()
+plot_heatmap_ainit_aslope 
+
+ggsave(plot_heatmap_ainit_aslope ,
+       file = "figures/plot_heatmap_ainit_aslope.pdf")
+
+
+plot_heatmap_c_aslope <- full_join(df.GRWL,df.glm_all) %>%
+  gather(com.comp.GRWL,com.comp.SLOPE, key="com.comp.int",value="com.comp.id") %>%
+  gather(c.i.i,c.i.j,c.j.i,c.j.j, 
+         key="parameter_c",value="c") %>%
+  gather(a_slope.i.i,a_slope.i.j,a_slope.j.i,a_slope.j.j, 
+         key="parameter_a_slope",value="a_slope") %>%
+  mutate(a_slope = case_when(function.int==1~0,
+                             T~a_slope))%>%
+  mutate(c = case_when(function.int==1~0,
+                             T~c)) %>%
+  ggplot(aes(x=a_slope,y=c,
+             color=as.factor(com.comp.id)))+ 
+  geom_point(alpha=0.5) +
+  scale_color_manual(values=safe_colorblind_palette) +
+  facet_grid(com.comp.int~function.int, scales="free") +
+  theme_bw()
+plot_heatmap_c_aslope
+
+plot_heatmap_N_aslope <- full_join(df.GRWL,df.glm_all) %>%
+  gather(com.comp.GRWL,com.comp.SLOPE, key="com.comp.int",value="com.comp.id") %>%
+  gather(Nmax.i.i,Nmax.i.j,Nmax.j.i,Nmax.j.j, 
+         key="parameter_Nmax",value="Nmax") %>%
+  gather(a_slope.i.i,a_slope.i.j,a_slope.j.i,a_slope.j.j, 
+         key="parameter_a_slope",value="a_slope") %>%
+  mutate(a_slope = case_when(function.int==1~0,
+                             T~a_slope))%>%
+  mutate(Nmax = case_when(function.int==1~0,
+                       T~Nmax)) %>%
+  ggplot(aes(x=a_slope,y=Nmax,
+             color=as.factor(com.comp.id)))+ 
+  geom_point(alpha=0.5) +
+  scale_color_manual(values=safe_colorblind_palette) +
+  facet_grid(com.comp.int~function.int, scales="free") +
+  theme_bw()
+plot_heatmap_N_aslope
+
+plot_heatmap_all<- full_join(df.GRWL,df.glm_all) %>%
+  gather(com.comp.GRWL,com.comp.SLOPE, key="com.comp.int",value="com.comp.id") %>%
+  gather(Nmax.i.i,Nmax.i.j,Nmax.j.i,Nmax.j.j, 
+         key="parameter_Nmax",value="Nmax") %>%
+  gather(a_initial.i.i,a_initial.i.j,a_initial.j.i,a_initial.j.j, 
+         key="parameter_a_initial",value="a_initial") %>%
+  gather(c.i.i,c.i.j,c.j.i,c.j.j, 
+         key="parameter_c",value="c") %>%
+  gather(a_slope.i.i,a_slope.i.j,a_slope.j.i,a_slope.j.j, 
+         key="parameter_a_slope",value="a_slope") %>%
+  mutate(a_slope = case_when(function.int==1~0,
+                             T~a_slope))%>%
+  mutate(Nmax = case_when(function.int==1~0,
+                          T~Nmax)) %>%
+  mutate(c = case_when(function.int==1~0,
+                          T~c)) %>%
+  gather(a_initial, a_slope, Nmax, c, 
+         key="parameter",value="value") %>%
+  ggplot(aes(x=value,y=com.comp.int,
+             color=as.factor(com.comp.id)))+ 
+  geom_point(alpha=0.5) +
+  scale_color_manual(values=safe_colorblind_palette) +
+  facet_wrap(parameter~function.int, 
+             scales= "free_x") +
+  theme_bw()
+plot_heatmap_all
+
+
+ggsave(plot_heatmap_all,
+       file = "figures/plot_heatmap_all.pdf")
+
+
+##########################################################################################################
+# 3. Standardization
 ##########################################################################################################
 df.sim$sim <- df.sim$sim.i
-df.glm_all_tojoin <- df.glm_all %>% select(c(-"time"))
 
-df.sim.std <- left_join(df.sim,df.glm_all_tojoin)
+df.sim.std <- left_join(df.sim,df.glm_all)
                         
 # check that no competition outcome is NA
-df.glm_all_tojoin[which(df.glm_all_tojoin$time==1 & df.glm_all_tojoin$function.int==4 & is.na(df.glm_all_tojoin$com.comp.coex)),]
+df.glm_all[which(df.glm_all$time==1 & df.glm_all$function.int==4 & is.na(df.glm_all$com.comp.coex)),]
 df.sim.std[which(df.sim.std$time==1 & df.sim.std$function.int==4 & is.na(df.sim.std$com.comp.coex)),]
 
 stand.variable <- c(paste0("Nmax",c(".i.j",".i.i",".j.i",".j.j")),
@@ -218,9 +384,9 @@ ggplot( df.sim.std, aes(x=com.comp.coex.int,
 sens_out <- tidy(model.2) %>% 
   mutate(function.int = 2) %>% 
   bind_rows(
-    (tidy(model.0) %>%
-       mutate(term = "function",
-              function.int = c(1,2,3,4))),
+    #(tidy(model.0) %>%
+       #mutate(term = "function",
+       #       function.int = c(1,2,3,4))),
     #(tidy(model.1) %>%
     #   mutate(function.int = 1)),
     (tidy(model.3) %>%

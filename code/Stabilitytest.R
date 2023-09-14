@@ -23,7 +23,7 @@ df.stability <- df.sim.std[which(df.sim.std$invader =="both"),]
    df.stability.n <-  df.stability[which(df.stability$sim== i &
                                            df.stability$function.int == function.int),]
  
-   df.stability.n <- df.stability.n[c(10:t.num*10),] # burn first 10 generations
+   df.stability.n <- df.stability.n[c(10:t.num),] # burn first 10 generations
   
 #Mean  over time   
    mean.i=c(mean(df.stability.n$Ni))
@@ -36,8 +36,8 @@ df.stability <- df.sim.std[which(df.sim.std$invader =="both"),]
    if(exists("stability.significance")){rm("stability.significance")}
    
    if(!is.na( mean.i) & !is.na( mean.j)){
-   ratio_i <- median(df.stability.n$Ni,na.rm=T)/IQR(df.stability.n$Ni,na.rm=T) 
-   ratio_j <- median(df.stability.n$Nj,na.rm=T)/IQR(df.stability.n$Nj,na.rm=T)
+   ratio_i <- mean(df.stability.n$Ni,na.rm=T)/var(df.stability.n$Ni,na.rm=T) 
+   ratio_j <- mean(df.stability.n$Nj,na.rm=T)/var(df.stability.n$Nj,na.rm=T)
    
       msdi <- sd(log10(df.stability.n$Ni))
       msdj <- sd(log10(df.stability.n$Nj))
@@ -50,7 +50,7 @@ df.stability <- df.sim.std[which(df.sim.std$invader =="both"),]
            stability.significance = "stable"
                }else{if( ratio_i > 1 | ratio_j > 1){
                  stability.significance = "half-stable"
-                      }else{stability.significance = "extinction"
+                      }else{stability.significance = "oscillatory"
                             }
                     }
               }
@@ -174,24 +174,31 @@ df.stability <- df.sim.std[which(df.sim.std$invader =="both"),]
       }
      
 #SYNCHRONIE OF NI AND NJ - > 1 synchrony | < 1 asynchrony
+   if(exists("vr.trial")){rm("vr.trial")}
+   
      if(   msdi > 0.05  & msdj > 0.05 &!is.na(msdi) &!is.na(msdj) &
-           mean(df.stability.n$Ni) > 0.05  & mean(df.stability.n$Nj) > 0.05 ){ # otherwise thre are no variation in the data
+           mean(df.stability.n$Ni[c(10:nrow( df.stability.n))]) > 0.05  & mean(df.stability.n$Nj) > 0.05 ){ # otherwise thre are no variation in the data
      df.stability.n.small <- t(as.matrix(data.frame(Ni= df.stability.n$Ni,
                                                     Nj =df.stability.n$Nj)[c(10:nrow( df.stability.n)),]))
-
-     vr.trial <- tsvreq_classic(df.stability.n.small)
+     an.error.occured <- FALSE
+     tryCatch( { vr.trial <- tsvreq_classic(df.stability.n.small); print(res) }
+               , error = function(e) {an.error.occured <<- TRUE})
+     if(exists("vr.trial")){
      aggresShort <- aggts(vr.trial, vr.trial$ts[vr.trial$ts<4])[[3]]
      aggresLong <- aggts(vr.trial, vr.trial$ts[vr.trial$ts>=4])[[3]]
      if(aggresShort>1 & aggresLong> 1){
        synchrony.significance <- 1
      }else{synchrony.significance <- 0}
-     
      }else{
        aggresLong <- NA
        aggresShort <- NA
        synchrony.significance <- NA
      }
-     
+     }else{
+       aggresLong <- NA
+       aggresShort <- NA
+       synchrony.significance <- NA
+     }
      df.stability.summary.n <- data.frame(sim = as.integer(i),
                                      function.int = as.integer(function.int),
                                      mean.i=c(mean(df.stability.n$Ni)),
@@ -242,15 +249,23 @@ df.sim.std.small$significance <- apply(df.sim.std.small[, c("synchrony.significa
                                               "stability.significance","oscillation.significance")],
                          1, function(x) toString(na.omit(x)))
 df.sim.std.small <- df.sim.std.small %>%
-  mutate(significance = case_when(significance == "synchrony, extinction"|
-                                    significance == "synchrony, extinction, half_oscillation"|
-                                     significance == "synchrony, extinction, oscillation" ~ "extinction",
-                                  #significance == "synchrony, half-stable oscillation"|
-                                 #   significance == "synchrony, half-stable oscillation, half_oscillation"|
-                                 #   significance == "synchrony, half-stable oscillation, oscillation" ~ "synchrony, half-stable oscillation",
-                                #  significance == "synchrony, stable oscillation, half_oscillation"~ "synchrony, stable oscillation",
-                                 # significance == "half-stable oscillation, half_oscillation" ~ "half-stable oscillation",
-                                 # significance == "stable oscillation, oscillation" ~ "stable oscillation",
+  mutate(significance = case_when(significance == "synchrony, oscillatory, oscillation" |
+                                    significance == "synchrony, oscillatory"|
+                                     significance == "synchrony, oscillatory, half_oscillation" ~ "synchronous oscillation",
+                                  
+                                   significance == "synchrony, half-stable, half_oscillation"|
+                                    significance == "synchrony, half-stable, oscillation" ~ "half-stable synchronous oscillation",
+                                 
+                                   significance =="stable, half_oscillation"|
+                                   significance =="stable, oscillation" ~ "stable oscillation",
+                                   significance =="oscillatory"|
+                                    significance =="oscillatory, half_oscillation" ~ "oscillation",
+                                  significance == "half-stable, half_oscillation"|
+                                   significance == "half-stable, oscillation" ~ "half-stable oscillation",
+                                  significance == "synchrony, half-stable" ~ "half-stable synchrony",
+                                  significance == "synchrony, stable" ~ "stable synchrony",
+                                  significance == "synchrony, stable, half_oscillation"|
+                                    significance == "synchrony, stable, oscillation"~ "stable synchronous oscillation",
                                   TRUE ~ significance
                                   ))
 
@@ -272,24 +287,21 @@ summary.stability.plot <-  ggplot(df.sim.std.small, aes(x=as.factor(com.comp.coe
                    pattern_spacing = 0.025,
                    pattern_key_scale_factor = 1,
                    na.rm=T) +  
-  scale_fill_manual(values=  c("#888888",
-                               "#661100","#CC6677","#882255","#AA4499",
-                               "#999933",  "#117733",              
-                               "#332288","#88CCEE",      
-                               "#6699CC", "#44AA99",
-                               "#DDCC77")) +
+  scale_fill_manual(values=  safe_colorblind_palette ) +
   scale_pattern_manual(values=c("stripe","none"),
                        labels=c("Less than 2 species","2 species")) +
   labs(title ="Percentage of community predicted to have both species in community with underlying dynamics",
       subtitle = " initial intraspecific interactions > initial interspecific community",
       pattern= "Community composition",
       fill = "Community dynamics") + 
+  guides(fill= guide_legend(override.aes = list(pattern = c("none"))),
+         pattern= guide_legend(override.aes = list(fill = c("white")))) +
   facet_wrap(function.int~., ncol=2, nrow=2) +
   theme(panel.background = element_blank(),
         legend.key.size = unit(1, 'cm')) 
   #theme_bw()
 
-summary.stability.plot
+summary.stability.plot 
 
 ggsave(summary.stability.plot, 
        file = "figures/summary.stability.plot.pdf")

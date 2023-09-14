@@ -52,10 +52,10 @@ Ricker_solution_ODE<- function(t, state, pars){
     }
     
     
-    Fi <-  exp(lambda[1] + aii * g[1]*Ni + aij *g[2]*Nj)
-    Fj <-  exp(lambda[2] + ajj * g[2]*Nj + aji *g[1]*Ni)
+    Fi <-  exp(lambda[1] + aii * g[1]*Ni + aij *g[2]*Nj + e[t])
+    Fj <-  exp(lambda[2] + ajj * g[2]*Nj + aji *g[1]*Ni + e[t])
     
-    Ni.diff <- ((1-g[1]) * s[1] + g[1] * Fi)*Ni
+    Ni.diff <- ((1-g[1]) * s[1] + g[1] * Fi)*Ni 
     Nj.diff <- ((1-g[2]) * s[2] + g[2] * Fj)*Nj
     return(list(c(x = Ni.diff, y = Nj.diff)))
     })
@@ -72,7 +72,7 @@ Ricker_solution<- function(gens,
   a_initial <- pars$a_initial # which int.function
   a_slope <- pars$a_slope # which int.function
   c <- pars$c # which int.function
-  
+  e <- pars$e
   
   df <- data.frame( t=0:gens,  Ni=numeric(1+gens),  Nj =numeric(1+gens) ,
                     dNi=numeric(1+gens),  dNj =numeric(1+gens) )
@@ -107,12 +107,12 @@ Ricker_solution<- function(gens,
       aji <- alpha_function4(a_initial[2,1], a_slope[2,1],c[2,1],g[1]*Ni, Nmax[1])
       ajj <- alpha_function4(a_initial[2,2], a_slope[2,2],c[2,2],g[2]*Nj, Nmax[2])
     }
+
     
+    Fi <-  exp(lambda[1] + aii * g[1]*Ni + aij *g[2]*Nj + e[t])
+    Fj <-  exp(lambda[2] + ajj * g[2]*Nj + aji *g[1]*Ni + e[t])
     
-    Fi <-  exp(lambda[1] + aii * g[1]*Ni + aij *g[2]*Nj)
-    Fj <-  exp(lambda[2] + ajj * g[2]*Nj + aji *g[1]*Ni)
-    
-    Nit1 <- ((1-g[1]) * s[1] + g[1] * Fi)*Ni
+    Nit1 <- ((1-g[1]) * s[1] + g[1] * Fi)*Ni 
     Njt1 <- ((1-g[2]) * s[2] + g[2] * Fj)*Nj
     Nidt <- Nit1/Ni
      Njdt <- Njt1/Nj
@@ -154,7 +154,7 @@ Ricker_solution_NatData <- function(gens,
     Fec <- c()
     Nt <- df[t,!position]  # species i densities
     for( n in 1:n.focal){
-      low= position.df[n]-(n.neigh - 1)
+      low = position.df[n]-(n.neigh - 1)
       up = position.df[n]
     if(function.int==1){
       a <- a_initial[low:up]
@@ -169,8 +169,7 @@ Ricker_solution_NatData <- function(gens,
       a <- alpha_function4(a_initial[low:up], a_slope[low:up],c[low:up],g*Nt, Nmax[low:up])
     }
   
-    Fec[n] <-  exp(lambda[position.df[n]] + sum(a*g*Nt))
-    
+    Fec[n] <- exp(lambda[position.df[n]] + sum(a*g*Nt))
     
     Nt1[n] <- ((1-g) * s + g* Fec[n])*Nt[n]
     
@@ -218,7 +217,6 @@ Ricker_solution_mono <- function(gens,
         aii <- alpha_function4(a_initial[1,1], a_slope[1,1],c[1,1],g[1]*Ni, Nmax[1])
       }
       
-      
       Fi <-  exp(lambda[1] + aii * g[1]*Ni )
       
       Nit1 <- ((1-g[1]) * s[1] + g[1] * Fi)*Ni
@@ -250,7 +248,6 @@ Ricker_solution_mono <- function(gens,
       if(function.int==4){
         ajj <- alpha_function4(a_initial[2,2], a_slope[2,2],c[2,2],g[2]*Nj, Nmax[2])
       }
-      
       
       Fj <-  exp(lambda[2] + ajj * g[2]*Nj)
       

@@ -64,6 +64,7 @@ competition <- competition %>%
             into = c("competitor", "abundance")) %>%
   spread(key=abundance,value=competitor)
 
+
 #names(competition) <- tolower(names(competition))
 
 # change the format of the rows to numeric 
@@ -73,7 +74,72 @@ competition[cols.num] <- sapply(competition[cols.num],as.numeric)
 # change na values to 0
 competition[is.na(competition)] <- 0
 
-#---- 1.2. Import the seeds data ----
+
+#---- 1.2. Make Teasorus ----
+tesaorus <- read.csv("data/tesaorus.csv",
+                        header = T,stringsAsFactors = F, sep=",",
+                        na.strings=c("","NA"))
+
+focal.levels <- levels(as.factor(competition$focal))
+
+AllSpNames <- names(competition)[!names(competition) %in% c("focal","year","day","month",
+                                                            "block","unique.plot",
+                                                            "flower","seeds","individual")]
+competition.long <- competition %>%
+  gather(all_of(AllSpNames), key="code", value="abundance") %>%
+  left_join(tesaorus, by = "code") %>%
+  tidyr::spread(key = code,value="abundance")
+forb <- tesaorus$code[which(tesaorus$functional.group =="forb")]
+forb <- forb[!forb %in% focal.levels]
+grass <- tesaorus$code[which(tesaorus$functional.group =="grass")]
+grass <- grass[!grass %in% focal.levels]
+
+competition$forb <- rowSums(competition[,AllSpNames[AllSpNames %in% forb]])
+competition$grass <- rowSums(competition[,AllSpNames[AllSpNames %in% grass]])
+
+#---- 1.4. Import Claire data for HYGA ----
+
+compHYGA <- read.csv("/Users/lisabuche/Documents/Projects/Original/Wainwright2022/Neighbourhoods_Wainwright_JEcol_180725.csv")
+names(compHYGA) <- tolower(names(compHYGA))
+compHYGA <- mutate_all(compHYGA, .funs=tolower)
+
+compHYGA <-compHYGA[which(compHYGA$reserve == "bendering" &
+                            (compHYGA$neighbour.id =="hypochaeris.glabra"|
+                            is.na(compHYGA$neighbour.id)) &
+                            compHYGA$focal.sp == "h" &
+                                (compHYGA$trt.comp == "s"| #solo 
+                                   compHYGA$trt.comp == "m")),] # monoculture competition
+compHYGA$neighbour.id[which(compHYGA$trt.comp == "m")] <- "HYGA"
+
+compHYGA <- compHYGA %>% spread(neighbour.id,number) 
+
+lambdaHYGA <- read.csv("/Users/lisabuche/Documents/Projects/Original/Wainwright2022/Individuals_Wainwright_JEcol_180725.csv")
+names(lambdaHYGA) <- tolower(names(lambdaHYGA))
+lambdaHYGA <- mutate_all(lambdaHYGA, .funs=tolower)
+
+lambdaHYGA <-lambdaHYGA[which(lambdaHYGA$reserve == "bendering" &
+                                lambdaHYGA$focal.sp == "h" &
+                                (lambdaHYGA$trt.comp == "s"| #solo 
+                                   lambdaHYGA$trt.comp == "m")),] # monoculture competition
+
+SuppdfHYGA <- full_join(lambdaHYGA,compHYGA)
+head(SuppdfHYGA)
+
+SuppdfHYGA <- SuppdfHYGA[,c("plot","focal.sp",
+                     "number.flowers.total","seedcount.extrapolated.integer",
+                     "HYGA")]
+
+names(SuppdfHYGA) <- c("unique.plot","focal",
+                       "flower","seeds","HYGA")
+SuppdfHYGA$year <- 2018
+SuppdfHYGA$focal <- "HYGA"
+SuppdfHYGA$unique.plot <- as.numeric(SuppdfHYGA$unique.plot)
+
+SuppdfHYGA$flower <- as.numeric(SuppdfHYGA$flower )
+SuppdfHYGA$HYGA <- as.numeric(SuppdfHYGA$HYGA)
+SuppdfHYGA$seeds <- as.numeric(SuppdfHYGA$seeds)
+
+#---- 1.4. Import the seeds data ----
 fecundity.df <- read.csv("/Users/lisabuche/Documents/Projects/Bendering/data/Bendering2022_seeds.csv",
                          header = T,stringsAsFactors = F, sep=",",
                          na.strings=c("","NA"))
@@ -102,14 +168,13 @@ focal.levels <- levels(as.factor(competition$focal))
 competition.seeds = data.frame()
 
 for(focal in focal.levels){
-  competition.n <- subset(competition, competition$focal == focal) 
+  competition.n <- competition[which(competition$focal == focal),]
 competition.n$seeds <-  competition.n$flower*
   rnorm(nrow(competition.n),
         mean=fecundity.summary$mean.seed[which(fecundity.summary$focal==focal)],
         sd = fecundity.summary$st.dev.seed[which(fecundity.summary$focal==focal)])
 competition.seeds <- rbind(competition.seeds,competition.n)
 }
-ggplot(competition.seeds,aes(x=seeds, color= focal) ) + geom_density()
 
 #---- 1.3. join competition with seeds production for each focal  ----
 
@@ -117,7 +182,7 @@ focal.levels <- levels(as.factor(competition$focal))
 
 Spcompetition <- list()
 
-for(focal in focal.levels){
+for(focal in focal.levels ){ #focal.levels
   
   competition.n <- subset(competition, competition$focal == focal) 
   # multiple by a number randomly draw from a normal distribution following seed production of the focal
@@ -125,19 +190,25 @@ for(focal in focal.levels){
     rnorm(nrow(competition.n),
           mean=fecundity.summary$mean.seed[which(fecundity.summary$focal==focal)],
           sd = fecundity.summary$st.dev.seed[which(fecundity.summary$focal==focal)])
-
+  competition.n$seeds <- round(competition.n$seeds) 
   #save(competition.n,
   #     paste0("results/stan/Competition_seeds_2022_",focal,".csv"))
+  if(focal =="HYGA"){
+    competition.n <- bind_rows(competition.n,SuppdfHYGA)
+  }
   Spcompetition[[focal]] <- competition.n
 }
-
+ggplot(Spcompetition[["HYGA"]],
+       aes(y=seeds, x=forb+grass+HYGA+LARO+POGN+RHCY+TROR))+
+  geom_smooth() + theme_bw()
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #---- 2. Run the model for each focal----
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 run.diagnostic =1
 run.stan = 1
-for(Code.focal in focal.levels){
-for (function.int in c(1:4)){
+function.grouping = 1
+for(Code.focal in focal.levels){ #focal.levels
+ for (function.int in c(1:4)){
   print(paste(Code.focal,", function",function.int))
 
     function.vec <- c(0,0,0,0)
@@ -145,7 +216,8 @@ for (function.int in c(1:4)){
  
  # data for the focal
   SpDataFocal <- Spcompetition[[Code.focal]]
- 
+  SpDataFocal <-  SpDataFocal[!is.na(SpDataFocal$seeds),]
+  SpDataFocal[is.na(SpDataFocal)] <- 0
   # Next continue to extract the data needed to run the model. 
   N <- as.integer(nrow(SpDataFocal))
   Fecundity <- as.integer(SpDataFocal$seeds)  
@@ -160,16 +232,20 @@ for (function.int in c(1:4)){
   AllSpNames <- names(SpDataFocal)[!names(SpDataFocal) %in% c("focal","year","day","month",
                                                               "block","unique.plot",
                                                               "flower","seeds","individual")]
-  
+
+  if( function.grouping ==1){
+    AllSpNames <- c("forb","grass",focal.levels)
+  }
 
   AllSpAbunds <- SpDataFocal %>% 
-    dplyr::select(all_of(AllSpNames))%>%
+    dplyr::select(all_of(c(AllSpNames)))%>%
     mutate_at( AllSpNames, as.numeric)
  
-  SpTotals <- colSums(AllSpAbunds)
-  SpToKeep <- SpTotals > 0
-  NamesSpToKeep <-names(SpToKeep)
-  S <- sum(SpToKeep)
+   SpTotals <- colSums(AllSpAbunds)
+   SpToKeep <- SpTotals > 0
+   NamesSpToKeep <-names(SpToKeep)
+   Stotal <- sum(SpToKeep)
+  
   #SpMatrix <- matrix(NA, nrow = N, ncol = S)
   #i <- 1
   #for(s in 1:ncol(AllSpAbunds)){
@@ -178,20 +254,30 @@ for (function.int in c(1:4)){
     #  i <- i + 1
    # }else{next}
   #}
-  S <- 1+length(focal.levels)
+  S <- 1 + length(focal.levels)
+  if( function.grouping ==1){
+    S <-  sum(SpToKeep) 
+  }
+  
   SpMatrix <- as.data.frame(matrix(NA, nrow = N, ncol = S ))
   #i <- 1
   for(i in 1:N){
+    if( function.grouping ==1){
+      SpMatrix <- AllSpAbunds
+      
+    }else{
    SpMatrix[i,1] <- sum(AllSpAbunds[i,NamesSpToKeep[!NamesSpToKeep %in% focal.levels]])
    SpMatrix[i,c(2:S)] <- AllSpAbunds[i,focal.levels]
+   names(SpMatrix) <-c("Neighbours",focal.levels)
+   
+    }
   }
-  names(SpMatrix) <-c("Neighbours",focal.levels)
   SpMatrix <- as.matrix(SpMatrix)
     #SpMatrix <-round((SpMatrix/max(SpMatrix))*100) #scale all the interaction between 0 and 100
   #if(max(SpMatrix) == 100){print("scale SpMatrix_plant correct")}
   
   SpNames <- AllSpNames[SpToKeep]
-  SpNames <-c("Neighbours",focal.levels)
+  #SpNames <-c("Neighbours",focal.levels)
   #assign(paste0("SpNames_",FocalPrefix),
   #     SpNames)
   Intra <- ifelse(SpNames == Code.focal, 1, 0)
@@ -238,10 +324,10 @@ for (function.int in c(1:4)){
   options(mc.cores = parallel::detectCores())
   # defiining initial value of lambda to help with computation failure
   # divide by the maximum expected for lambda = U 
-  list.init <- function(...)list(lambdas = array(as.numeric(rnorm(1,
-                                                                  mean=log(fecundity.summary$mean.seed[which(fecundity.summary$focal==Code.focal)]),
+  list.init <- function(...)list(lambdas = array(abs(as.numeric(rnorm(1,
+                                                                  mean=log(fecundity.summary$mean.seed[which(fecundity.summary$focal==Code.focal)])/U,
                                                                   sd = abs(log(fecundity.summary$st.dev.seed[which(fecundity.summary$focal==Code.focal)])))/
-                                                              U), 
+                                                              U)), 
                                                             dim = 1))
 
   if( run.stan == 1){                               
@@ -278,15 +364,15 @@ for (function.int in c(1:4)){
   stan_post_pred_check(FinalPosteriors,"F_hat",Fecundity,
                        paste0("results/stan/PostFec_",Code.focal,"_",alpha.function,".csv.gz")) 
   
-  log_lik_2 <- loo::extract_log_lik(FinalFit, 
-                                    parameter_name = "F_sim", 
-                                    merge_chains = F)
+  #log_lik_2 <- loo::extract_log_lik(FinalFit, 
+  #                                  parameter_name = "F_sim", 
+  #                                  merge_chains = F)
   
-  r_eff <- loo::relative_eff(exp(log_lik_2), cores = 2) 
+  #r_eff <- loo::relative_eff(exp(log_lik_2), cores = 2) 
   
-  loo_1 <- loo::loo(log_lik_2 , r_eff = r_eff, cores = 2)
+ # loo_1 <- loo::loo(log_lik_2 , r_eff = r_eff, cores = 2)
   
-  print(loo_1)
+ # print(loo_1)
   
   # N.B. amount by which autocorrelation within the chains increases uncertainty in estimates can be measured
   hist(summary(FinalFit)$summary[,"Rhat"],
@@ -321,11 +407,11 @@ for (function.int in c(1:4)){
   
   assign(paste0("Parameters_",Code.focal,"_",alpha.function),
        list(DataVec = DataVec,
-       alpha_value=FinalPosteriors$alpha_value,      
+       alpha_value= FinalPosteriors$alpha_value,      
        lambda =  FinalPosteriors$lambda_ei,
-       alpha_slope= FinalPosteriors$alpha_slope,
+       alpha_slope= FinalPosteriors$alpha_slope_ei,
        alpha_init =FinalPosteriors$alpha_init,
-       alpha_c = FinalPosteriors$c
+       alpha_c = FinalPosteriors$c_ei
        ))
   
   save(list =paste0("Parameters_",Code.focal,"_",alpha.function),
@@ -349,7 +435,6 @@ for (function.int in c(1:4)){
 load("results/stan/NaturalData_PostFecunditydistribution.csv.gz")
 Post_Fecunditydistribution <- PostFecunditydistribution %>%
   filter(!is.na(Fec))
-
 #---- 4.0. check models ----
 ModelCheck <- NULL
 for(Code.focal in focal.levels){
@@ -374,12 +459,13 @@ View(ModelCheck)
 
 #---- 4.1 Alpha distribution ----
 
-neighbours.vec <- c("neighbours",focal.levels)
+neighbours.vec <- c("forb","grass",focal.levels)
 
 df_alpha_all <- data.frame(focal=NA)
 for(Code.focal in focal.levels){
   for (function.int in c(1:4)){
     if (Code.focal == "TROR") next
+    if (Code.focal == "HYGA") next
     df_alpha <- data.frame()
     function.vec <- c(0,0,0,0)
     function.vec[function.int] <- 1
@@ -389,7 +475,7 @@ for(Code.focal in focal.levels){
     parameters <- get(paste0("Parameters_",Code.focal,"_",alpha.function))
     N <- parameters[["DataVec"]]$N
     Nmax <- parameters[["DataVec"]]$Nmax
-    neighbours.vec <- c("neighbours",focal.levels)
+    neighbours.vec <- c("forb","grass",focal.levels)
     df_alpha_init <- data.frame(observation = c(1:N),
                                  focal = Code.focal,
                                  function.int = function.int)
@@ -439,11 +525,12 @@ for(Code.focal in focal.levels){
 df_alpha_all <- df_alpha_all[-1,] # nrow = 120 == 4(fct) * 5(species) * 6(neighbours)
 str(df_alpha_all)
 
-
+levels(as.factor(df_alpha_all$neigh))
 
 
 df_funct_alpha <- NULL
 for (n in 1:nrow(df_alpha_all)){
+  if(df_alpha_all$focal[n] =="HYGA") next
   print(n)
   df_funct_alpha_n <- df_alpha_all[n,]
   df_funct_alpha_n <- data.frame(density=c(0:10),df_funct_alpha_n)
@@ -485,7 +572,8 @@ write.csv(df_funct_alpha,
 cbp2 <- c("#000000", "#E69F00", "#56B4E9","#F0E442","#009E73",
           "#CC79A7", "#0072B2", "#D55E00")
 
-cb2_focal <- c("#E69F00", "#56B4E9","#009E73","#CC79A7")
+cb2_focal <- c("#F0E442","#009E73",
+               "#CC79A7", "#0072B2")
 
 plot.list.alpha <- list()
 
@@ -503,9 +591,9 @@ for( n in 1:4){
                                       color=neigh,fill=neigh)) +
     stat_smooth(method = 'gam',se = TRUE,level =0.95) +
     facet_wrap(. ~ function.int, strip.position = "top",
-               nrow=1, ncol=4, scales = "fixed") +
-    scale_color_manual("neighbours identity",values=cbp2[2:7]) + 
-    scale_fill_manual("neighbours identity",values=cbp2[2:7]) + 
+               nrow=1, ncol=4, scales = "free") +
+    scale_color_manual("neighbours identity",values=cbp2[2:9]) + 
+    scale_fill_manual("neighbours identity",values=cbp2[2:9]) + 
     theme_bw() +
     labs(title = element_text(focal.levels[n],
                               color=cb2_focal[n]),
@@ -535,49 +623,6 @@ plot.alpha_all <- annotate_figure(plot.alpha_all, left = textGrob("Effect of nei
 ggsave(plot.alpha_all,
        file = "figures/NatData_plot_alpha_all.pdf")
 
-plot.list.alpha <- list()
-
-for( n in 1:4){
-  df <- df_funct_alpha[which(df_funct_alpha$focal == focal.levels[n] &
-                               (df_funct_alpha$function.int == 1|
-                                  df_funct_alpha$function.int == 4)),]
-  plot.list.alpha[[n]] <- ggplot(df,aes(x=density, y= alpha_value,
-                                        color=neigh,fill=neigh)) +
-    stat_smooth(method = 'gam',se = TRUE,level =0.95) +
-    facet_wrap(. ~ function.int, strip.position = "top",
-               nrow=1, ncol=2, scales = "fixed") +
-    scale_color_manual("neighbours identity",values=cbp2[2:7]) + 
-    scale_fill_manual("neighbours identity",values=cbp2[2:7]) + 
-    theme_bw() +
-    labs(title = element_text(focal.levels[n],
-                              color=cb2_focal[n]),
-         y= "Effect of neighbours on focal",
-         x="density of neighbours") +
-    rremove("ylab") + rremove("xlab") + 
-    geom_hline(yintercept=0, color="black", linetype="dashed") +
-    theme(plot.title = element_text(color=cb2_focal[n],
-                                    vjust = -5),
-          strip.background = element_blank(), 
-          strip.placement = "outside",
-          strip.text =element_text(color="black"),
-          legend.key= element_rect(fill = "white"),
-          plot.margin = unit(c(-1,0.2,0,0.2), 'lines')) 
-}
-
-
-
-plot.alpha_short <- ggarrange(plotlist = plot.list.alpha,
-                            labels = NULL,
-                            align = "hv",
-                            font.label = list(size = 10, color = "black", 
-                                              face = "bold", family = NULL, position = "top"),
-                            nrow=4, common.legend=T, legend="right")
-library(grid)
-plot.alpha_short <- annotate_figure(plot.alpha_short, left = textGrob("Effect of neighbours on focal", rot = 90, vjust = 1, gp = gpar(cex = 1.3)),
-                                  bottom = textGrob("density of neighbours", gp = gpar(cex = 1.3)))
-ggsave(plot.alpha_short,
-       file = "figures/NatData_plot_alpha_short.pdf")
-
 
 #---- 4.2. Population Projections ----
 
@@ -594,7 +639,7 @@ for(Code.focal in focal.levels){
     parameters <- get(paste0("Parameters_",Code.focal,"_",alpha.function))
     N <- parameters[["DataVec"]]$N
     Nmax <- parameters[["DataVec"]]$Nmax
-    neighbours.vec <- c("neighbours",focal.levels)
+    neighbours.vec <- c("forb","grass",focal.levels)
     df_param_init <- data.frame(observation = c(1:N),
                                 focal = Code.focal,
                                 function.int = function.int)
@@ -651,17 +696,17 @@ for (function.int in c(1:4)){
   param.df$s = 1
   state = c(1)
   
-  df_projection_n <- Ricker_solution_NatData(gens = 250,
+  df_projection_n <- Ricker_solution_NatData(gens = 20,
                                              state,pars = param.df)
   df_projection_n$function.int <- function.int
   df_projection <-  bind_rows(df_projection, df_projection_n)
 }
 
 plot_projection <- df_projection %>%
-  gather(all_of(c(focal.levels,"neighbours")), key="species", value="abundance") %>%
+  gather(all_of(   neighbours.vec ), key="species", value="abundance") %>%
   ggplot(aes(y=abundance, x= time, group=species, color=species)) +
-  geom_smooth() + scale_y_log10() +
-  facet_grid(.~as.factor(function.int),
+  geom_path() + scale_y_log10() +
+  facet_grid(as.factor(function.int)~.,
              scales="free") +
   theme_bw()
 

@@ -7,10 +7,8 @@ ARMApqREMLfunct(arima(X_i) for EigB","if p _ij>0 |q_j> 0 & EigB_j>0    AND  p _i
 if p > 0 and q > 0 and EigB>0 ~ Oscillation",https://doi.org/10.1890/09-0442.1,
 Correlation,correlation over time,"pcor(X_i, X_j) ",coor.p_value > 0.05 ~ Correlation,,
 Synchrony,timescale-specific variance ratio,"tsvreq_classic(X_i, X_j)",tsvr > 1 ~ synchrony,doi: 10.2307/1936306,
-Stability,ratio median/IQR  ,median(X_i)/IQR(X_i) ,"ratio > 1 ~ stability of oscillation
+Stability,ratio median/IQR  ,mean(X_i)/var(X_i) ,"ratio > 1 ~ stability
 ratio < 0 ~ stability",,
-,,,,,
-Composition,Metric,,,,
 "community 
 composition","Slope of abundances over time 
 (generations= 100)
@@ -36,4 +34,3 @@ $\lambda$,1,Constant for all species,,,
 $g$,1,Constant for all species,,,
 ,,,,,
 $s$,1,Constant for all species,,,
-,,,,,
