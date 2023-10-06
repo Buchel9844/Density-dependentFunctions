@@ -19,10 +19,10 @@ data{
 
 parameters{
   vector<lower=0,upper =1>[1] lambdas; // intrinsic growth rate - always positive
-  vector<lower=0,upper =1>[S] c; //slope of the inflation point - specific distribution - always positive
+  vector<lower=-1,upper =0>[S] c; //stretching parameters
 
   vector<lower=-1,upper =0>[S] alpha_initial; // initial effect of j on i - when Nj is minimal
-  vector<lower=-1,upper =0>[S] alpha_slope; // impact of the addition of one individual of j, on the fecundity of i. 
+  vector<lower=-1,upper =0>[S] alpha_slope; // decay - impact of the addition of one individual of j, on the fecundity of i. 
 
     
   real<lower=0> disp_dev; // species-specific dispersion deviation parameter,
@@ -49,8 +49,8 @@ transformed parameters{
     lambda_ei[i] = U*lambdas[1];
     for(s in 1:S){
     //scaling factor
-    alpha_slope_ei[s] = alpha_slope[s] - 0.5; //scaling to have higher values
-    c_ei[s] = c[s] + 0.5;
+    //alpha_slope_ei[s] = alpha_slope[s] - 0.5; //scaling to have higher values
+    //c_ei[s] = c[s] + 0.5;
       if(alphaFunct1 ==1){
       alpha_value[i,s]= alpha_initial[s];
       alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
@@ -60,11 +60,11 @@ transformed parameters{
       alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct3 ==1){
-         alpha_value[i,s] = alpha_initial[s] + alpha_slope[s]*(1 - exp(-c[s]*(SpMatrix[i,s]-Nmax[s])));
+         alpha_value[i,s] = alpha_initial[s] + c[s]*(1 - exp(alpha_slope[s]*(SpMatrix[i,s]-Nmax[s])));
       alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct4 ==1){
-         alpha_value[i,s]= alpha_initial[s] + (alpha_slope[s]*(1 - exp(-c[s]*(SpMatrix[i,s]-Nmax[s]))))/(1+exp(-c[s]*(SpMatrix[i,s]-Nmax[s])));
+         alpha_value[i,s]= alpha_initial[s] + (c[s]*(1 - exp(alpha_slope[s]*(SpMatrix[i,s]-Nmax[s]))))/(1+exp(alpha_slope[s]*(SpMatrix[i,s]-Nmax[s])));
       alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
     }
@@ -79,9 +79,9 @@ transformed parameters{
 model{
   // set regular priors
   alpha_initial ~ normal(0,1);
-  alpha_slope ~ normal(0,0.5);
+  alpha_slope ~ normal(0,1);
   lambdas ~ normal(0,1);
-  c ~ normal(0, 0.5);
+  c ~ normal(0, 1);
   disp_dev ~ cauchy(0, 1);  // safer to place prior on disp_dev than on phi
   
 

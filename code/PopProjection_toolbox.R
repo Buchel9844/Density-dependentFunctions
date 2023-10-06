@@ -6,18 +6,18 @@ alpha_function2 <- function(Amin, Aslopes,N,N0){
   return(alpha)
 }
 alpha_function3 <- function(Amin, Aslopes,c,N,N0){
-  alpha = Amin + Aslopes*(1-exp(-c*(N-N0)))
+  alpha = Amin + c*(1-exp(Aslopes*(N-N0)))
   #if((N-N0) >10 ){
   #  alpha = Amin + Aslopes*(1-exp(-c*(10)))
   #}
   return(alpha)
 }
 alpha_function4  <- function(Amin, Aslopes,c,N,N0){
-  e = exp(-c*(N-N0)) # c is stretching the graph horizontally 
+  e = exp(Aslopes*(N-N0)) # c is stretching the graph horizontally 
   #if((N-N0) >10 ){
   #  e = exp(-Aslopes*(10))
   #}
-  a = Aslopes*(1-e) #stretching the graph vertically
+  a = c*(1-e) #stretching the graph vertically
   d = Amin
   alpha = (a/(1 + e)) + d
   
@@ -61,10 +61,11 @@ Ricker_solution_ODE<- function(t, state, pars){
     })
 }
 
-Ricker_solution<- function(gens,
+Ricker_solution <- function(gens,
                                 state,
                                 pars,
-                           function.int ) {
+                           function.int,
+                           add_external_factor) {
   Nmax <- pars$Nmax # density at which fecundity is max - effect of neighbors is 0
   g <- pars$g # germination rate 
   s <- pars$s #seed survival
@@ -72,12 +73,20 @@ Ricker_solution<- function(gens,
   a_initial <- pars$a_initial # which int.function
   a_slope <- pars$a_slope # which int.function
   c <- pars$c # which int.function
-  e <- pars$e
   
   df <- data.frame( t=0:gens,  Ni=numeric(1+gens),  Nj =numeric(1+gens) ,
                     dNi=numeric(1+gens),  dNj =numeric(1+gens) )
   df[1,2:3] <- c(state[1],state[2]) #species i initial densities
   
+  if(add_external_factor =="none"){
+    e <- rep(0,times=gens)
+  }
+  if(add_external_factor =="season"){
+    e <- pars$e_seasonal
+  }
+  if(add_external_factor =="noise"){
+    e <- pars$e_noise
+  }
   for(t in 1:gens){
     
     Ni <- df[t,"Ni"] # species i densities
@@ -115,11 +124,13 @@ Ricker_solution<- function(gens,
     Nit1 <- ((1-g[1]) * s[1] + g[1] * Fi)*Ni 
     Njt1 <- ((1-g[2]) * s[2] + g[2] * Fj)*Nj
     Nidt <- Nit1/Ni
-     Njdt <- Njt1/Nj
+    Njdt <- Njt1/Nj
     
-    df[t+1,2:5] <- c(Nit1, Njt1, Nidt, Njdt)
+    df[t,4:5] <- c(Nidt, Njdt)
+    df[t+1,2:3] <- c(Nit1, Njt1)
   }
-  names(df) <- c("time","Ni","Nj","dNi","dNj")
+  df[c(1:length(e)),6] <- c(e)
+  names(df) <- c("time","Ni","Nj","dNi","dNj","external.fact")
   return(df)
 }
 
@@ -146,8 +157,8 @@ Ricker_solution_NatData <- function(gens,
   df <- data.frame(matrix(data= rep(NA,each=(1+gens)*n.neigh),
                           ncol=n.neigh, nrow=1+gens))
   names(df) <- c(paste0("N",1:n.neigh))
-  df[1,] <- rep(state,each=n.neigh) #species i initial densities
-  df[,position] <- 1
+  df[1,] <- state #species i initial densities
+  df[,position] <- state
 
   for(t in 1:gens){
     Nt1 <- c()
@@ -264,7 +275,7 @@ Ricker_solution_mono <- function(gens,
 
 # function modified from https://github.com/laurenmh/avena-erodium/blob/master/invader_resident_comparison.R
 
-GrowthSimInv = function(par.dat, t.num,function.int) {
+GrowthSimInv = function(par.dat, t.num,function.int,add_external_factor) {
   
   N1 = c(1,0) #c("Ni", "Nj")
   Niequil <- Ricker_solution_mono(state =  N1, pars= par.dat, gens=t.num,
@@ -277,14 +288,14 @@ GrowthSimInv = function(par.dat, t.num,function.int) {
   
   N3 = c(Niequil[t.num, 2],1) #c("Ni*", "Nj")
   Njinvade <- Ricker_solution(state = N3, pars= par.dat, gens=t.num,
-                              function.int)
+                              function.int,add_external_factor)
   
   Njinvade$invader <- "Nj"
   Njinvade$time <- as.numeric(row.names(Njinvade))
   
   N4 = c(1, Njequil[t.num, 3]) #c("Ni", "Nj")
   Niinvade <- Ricker_solution(state = N4, pars= par.dat, gens=t.num,
-                              function.int)
+                              function.int,add_external_factor)
   
   Niinvade$invader <- "Ni"
   Niinvade$time <- as.numeric(row.names(Niinvade))
