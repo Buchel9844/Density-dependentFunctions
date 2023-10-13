@@ -13,23 +13,28 @@ library(broom)
 # Stability metric
 ##########################################################################################################
  source("code/TimeSerie_toolbox.R")
-df.stability <- df.sim.std[which(df.sim.std$invader =="both"),]
+df.stability <- as.data.frame(df.sim.comcomp[which(df.sim.comcomp$invader =="both"),])
  
  summary.df.stability <- NULL
- nsims <- 100
+ nsims <- 500
  t.num = 100 # number of generation
+ stand.variable <- c(paste0("a_initial",c(".i.i",".j.j",".i.j",".j.i")),
+                     paste0("a_slope",c(".i.i",".j.j",".i.j",".j.i")),
+                     paste0("c",c(".i.i",".j.j",".i.j",".j.i")),
+                     paste0("Nmax",c(".i.i",".j.j",".i.j",".j.i")))
+ 
+ 
  df.stability.summary <- NULL
-for(i in 1:nsims){
+ for(i in 1:nsims){
    for( function.int in 1:4){
-     for(add_external_factor in c("none","season","noise")){
+     for(add_external_factor in c("No external factor","Noisy change","Periodic change")){
        print(paste0("int ", i,"for funct ",function.int, add_external_factor))
        
-   df.stability.n.full <-  df.stability[which(df.stability$sim== i &
+   df.stability.n <-  as.data.frame(df.stability[which(df.stability$sim.i == i & 
+                                           df.stability$time > 10 & 
                                            df.stability$function.int == function.int &
-                                           df.stability$external_fact ==add_external_factor),] 
+                                           df.stability$external_fact == add_external_factor),] )
  
-   df.stability.n <- df.stability.n.full[c(10:t.num),] # burn first 10 generations
-  
 #Mean  over time   
    mean.i=c(mean(df.stability.n$Ni))
    mean.j=c(mean(df.stability.n$Nj))
@@ -38,29 +43,47 @@ for(i in 1:nsims){
  # Plaza et al,2012 https://doi.org/10.1111/j.1654-1103.2011.01381.x
  #  amplitude of population fluctuations by means of the standard deviation
    # ratio between median and interquantile
+   stability.int <- c()
    if(exists("stability.significance")){rm("stability.significance")}
    
-   if(!is.na( mean.i) & !is.na( mean.j)){
    ratio_i <- mean(df.stability.n$Ni,na.rm=T)/var(df.stability.n$Ni,na.rm=T) 
    ratio_j <- mean(df.stability.n$Nj,na.rm=T)/var(df.stability.n$Nj,na.rm=T)
    
       msdi <- sd(log10(df.stability.n$Ni))
       msdj <- sd(log10(df.stability.n$Nj))
-      
-
-    if(!is.na(ratio_j) & !is.na(ratio_i)){
-     if(is.infinite(ratio_i) & is.infinite(ratio_j) ){
-        stability.significance = "stable"
-         }else{if( ratio_i > 1 & ratio_j > 1){
-           stability.significance = "stable"
-               }else{if( ratio_i > 1 | ratio_j > 1){
-                 stability.significance = "half-stable"
-                      }else{stability.significance = "oscillatory"
-                            }
-                    }
-              }
-        }
+      # for j
+    if(is.na(ratio_j)){
+      stability.int <- 0
     }
+    if(!is.na(ratio_j)){
+    if(is.infinite(ratio_j)|ratio_j > 1){
+      stability.int <- 1
+    }else{
+      stability.int <- 0
+    }
+    }
+      #for i
+      if(is.na(ratio_i)){
+        stability.int <- stability.int + 0
+      }
+      if(!is.na(ratio_i)){
+        if(is.infinite(ratio_i)|ratio_i > 1){
+        stability.int <- stability.int + 1
+        }else{
+          stability.int <- 0
+        }
+      }
+      
+      if(stability.int ==0){
+        stability.significance = "unstable"
+      }
+      if(stability.int ==1){
+        stability.significance = "half-stable"
+      }
+      if(stability.int ==2){
+        stability.significance = "stable"
+      }
+      
       if(!exists("stability.significance")){
         stability.significance = "no"
         ratio_i <- NA
@@ -71,8 +94,9 @@ for(i in 1:nsims){
 #ARIMA is the abbreviation for AutoRegressive Integrated Moving Average.      
       #for j
       if(exists(c("p.j"))|exists(c("p.i"))){rm(p.j,q.j,p.i,q.i)}
-      if(mean(log(df.stability.n$Nj))>0 & !is.na(mean(log(df.stability.n$Nj)))){
-      fitARIMA.j <- auto.arima(log(df.stability.n$Nj)) # function in R uses a combination of unit root tests, minimization of the AIC and MLE to obtain an ARIMA model
+   
+      if(median(df.stability.n$Nj) > 0 & var(df.stability.n$Nj) > 0  & !is.na(mean(log(df.stability.n$Nj)))){
+      fitARIMA.j <- auto.arima(df.stability.n$Nj) # function in R uses a combination of unit root tests, minimization of the AIC and MLE to obtain an ARIMA model
       p.j = summary(fitARIMA.j)$arma[1]#ARIMA(p,d,q)
       q.j = summary(fitARIMA.j)$arma[2]
       # summary(fitARIMA.j)
@@ -94,14 +118,14 @@ for(i in 1:nsims){
                               eigB.j = NA)
       }
       # for i 
-        if(mean(log(df.stability.n$Ni))>0 & !is.na(mean(log(df.stability.n$Ni)))){
-      fitARIMA.i <- auto.arima(log(df.stability.n$Ni)) 
+        if(median(df.stability.n$Ni) > 0.001 & var(df.stability.n$Ni) > 0.001 & !is.na(mean(log(df.stability.n$Ni)))){
+      fitARIMA.i <- auto.arima(df.stability.n$Ni)
       p.i = summary(fitARIMA.i)$arma[1]#ARIMA(p,d,q)
       q.i = summary(fitARIMA.i)$arma[2]
       
       if(p.i > 0 & q.i >= 0){
         coeff.i = summary(fitARIMA.i)$coef
-        arima.extract.i  <-ARMApqREMLfunct(coeff.i ,log(df.stability.n$Ni),p.i,q.i)
+        arima.extract.i  <- ARMApqREMLfunct(coeff.i, log(df.stability.n$Ni),p.i,q.i)
         names(coeff.i) <- paste0(names(coeff.i), ".i")
         coeff.i <- as.data.frame(t(as.matrix(coeff.i)))
         coeff.i$p.i = p.i#ARIMA(p,d,q)
@@ -176,6 +200,7 @@ for(i in 1:nsims){
        aggresShort <- NA
        synchrony.significance <- NA
      }
+   
      df.stability.summary.n <- data.frame(sim = as.integer(i),
                                      function.int = as.integer(function.int),
                                      external_factor = add_external_factor,
@@ -192,9 +217,12 @@ for(i in 1:nsims){
                                      #correlation.significance= correlation.significance,
                                      synchrony.significance = synchrony.significance,
                                      synchrony.long = aggresLong,
-                                     synchrony.short = aggresShort) %>%
-       bind_cols(bind_cols(coeff.j,coeff.i)) %>%
-       bind_cols(df.stability.n.full[1,c(stand.variable,"com.comp.GRWL","com.comp.coex.int")])
+                                     synchrony.short = aggresShort) 
+
+     df.stability.summary.n <- bind_cols(df.stability.summary.n,bind_cols(coeff.j,coeff.i))
+     df.stability.summary.n <- full_join(df.stability.summary.n , 
+                                         as.data.frame(df.stability.n[1,]), 
+                 by = c("sim", "function.int", "external_factor"))
     
     df.stability.summary <- bind_rows(df.stability.summary,df.stability.summary.n)
                                      
@@ -237,6 +265,9 @@ df.stability.summary.small <- df.stability.summary.small %>%
                                   significance == "synchrony, stable" ~ "stable synchrony",
                                   significance == "synchrony, stable, half_oscillation"|
                                     significance == "synchrony, stable, oscillation"~ "stable synchronous oscillation",
+                                  significance == "synchrony, unstable"|significance == "unstable, half_oscillation"|
+                                    significance == "synchrony, unstable, oscillation"|significance == "unstable, oscillation"|
+                                    significance == "synchrony, unstable, half_oscillation"~ "unstable synchronous oscillation",
                                   TRUE ~ significance
                                   )) 
 
@@ -250,19 +281,34 @@ safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#33228
 colorblind_palette_8 <- safe_colorblind_palette[!safe_colorblind_palette %in% my_cols]
 #scales::show_col(safe_colorblind_palette)
 
+df.stability.summary.small <- df.stability.summary.small  %>%
+  mutate(function.name = case_when(function.int==1 ~"1.Constant",
+                                   function.int==2 ~"2.Linear",
+                                   function.int==3 ~"3.Exp",
+                                   function.int==4 ~"4.Sigmoid"))
+  
+  
 summary.stability.plot <-  df.stability.summary.small %>%
-  filter(com.comp.GRWL == "j_i") %>%
-  ggplot(aes(x=as.factor(com.comp.GRWL), fill=as.factor(significance))) + 
+  #filter(comp.com !="no species" & comp.com !="run away population") %>%
+  ggplot(aes(x=as.factor(function.name), fill=as.factor(significance))) + 
   scale_fill_manual(values=  safe_colorblind_palette ) +
   stat_count(position="stack")+
-  labs(title ="Percentage of community predicted to have both species in community with underlying dynamics",
-      subtitle = " initial intraspecific interactions > initial interspecific community",
+  labs(title ="Percentage of community predicted to have at least one species in \nthe community with underlying dynamics",
+      #subtitle = " initial intraspecific interactions",
       pattern= "Community composition",
-      fill = "Community dynamics") + 
+      fill = "Community dynamics",
+      y="Number of communities driven by a specific dynamics",
+      x="interaction function") + 
   guides(fill= guide_legend(override.aes = list(pattern = c("none")))) +
-  facet_wrap(as.factor(external_factor)~function.int, ncol=4, nrow=3) +
+  facet_wrap(as.factor(external_factor)~., nrow=3) +
   theme(panel.background = element_blank(),
-        legend.key.size = unit(1, 'cm')) 
+        legend.key.size = unit(1, 'cm'),
+        title =element_text(size=16),
+        axis.text.x= element_text(size=16),
+        axis.text.y= element_text(size=16),
+        legend.text=element_text(size=16),
+        legend.title=element_text(size=16),
+        strip.text = element_text(size=16)) 
   #theme_bw()
 
 summary.stability.plot 
@@ -492,13 +538,10 @@ ggsave("figures/sensitivity_analysis_stability.pdf",
        width = 10, height = 8)
 
 #---- detailed visualisation -----
-df.stability.summary <- df.stability.summary
-df.stability.summary %>%
-  gather(msd.i,msd.i, key="msd",value="value.msd" ) 
-  gather(msd.i,msd.i, key="msd",value="value.msd" ) %>%
-    df.stability.summary%>%
+df.stability.summary <- df.stability.summary %>%
+  gather(ratio.i,ratio.j, key="stability",value="value.stability" ) %>%
     ggplot(aes(fill=as.factor(function.int))) + 
-           stat_count(aes(x=as.factor(correlation.significance))) +
+           stat_count(aes(x=as.factor(value.stability))) +
   theme_bw() + 
   scale_fill_colorblind()
   

@@ -1,6 +1,203 @@
 library(IDPmisc) # for function NaRV.omit()
+library(ggpattern)
 ##########################################################################################################
-# 1. minimum  population  size
+# 1. minimum  abundance
+##########################################################################################################
+
+df.min.abundance <- NULL
+nsims <- 500
+for(i in 1:nsims){
+  for( function.int in 1:4){
+    for(add_external_factor in c("No external factor","Noisy change","Periodic change")){
+      print(paste0("int ", i,"for funct ",function.int, add_external_factor))
+      
+      vec.abundance.Ni <- df.sim$Ni[which(df.sim$sim.i == i &
+                                df.sim$function.int == function.int &
+                                df.sim$external_factor == add_external_factor)]
+      
+      vec.abundance.Nj <- df.sim$Nj[which(df.sim$sim.i == i &
+                                         df.sim$function.int == function.int &
+                                         df.sim$external_factor == add_external_factor)]
+      
+      vec.GR.Ni <- df.sim$dNi[which(df.sim$sim.i == i &
+                                         df.sim$function.int == function.int &
+                                         df.sim$external_factor == add_external_factor)]
+      vec.GR.Nj <- df.sim$dNj[which(df.sim$sim.i == i &
+                                         df.sim$function.int == function.int &
+                                         df.sim$external_factor == add_external_factor)]
+       
+      
+      df.min.abun.n <- data.frame(sim = i,
+                                 function.int= function.int,
+                                external_factor = add_external_factor,
+                                focal = c("Ni","Nj"),
+                                mean.abundance = c(mean(vec.abundance.Ni, na.rm=T),mean(vec.abundance.Nj, na.rm=T)),
+                                median.abundance = c(median(vec.abundance.Ni, na.rm=T),median(vec.abundance.Nj, na.rm=T)),
+                                min.abundance = c(min(vec.abundance.Ni, na.rm=T),min(vec.abundance.Nj, na.rm=T)),
+                                min.GR = c(vec.GR.Ni[which(vec.abundance.Ni ==min(vec.abundance.Ni, na.rm=T))[1]],
+                                           vec.GR.Nj[which(vec.abundance.Nj ==min(vec.abundance.Nj, na.rm=T))[1]]),
+                                max.abundance = c(max(vec.abundance.Ni, na.rm=T),max(vec.abundance.Nj, na.rm=T)),
+                                max.GR = c(max(vec.GR.Ni, na.rm=T),max(vec.GR.Nj, na.rm=T)))
+      
+      df.min.abundance <- bind_rows(df.min.abundance,df.min.abun.n)
+    }
+  }
+}
+
+df.min.abundance  <- df.min.abundance  %>%
+  mutate(function.name = case_when(function.int==1 ~"1.Constant",
+                                   function.int==2 ~"2.Linear",
+                                   function.int==3 ~"3.Exp",
+                                   function.int==4 ~"4.Sigmoid")) %>%
+  mutate(Mean.class = case_when(mean.abundance < 0.05 ~"Null",
+                                mean.abundance > 500 ~"Runaway",
+                              T ~"Okay"),
+         Median.class = case_when(median.abundance < 0.05 ~"Null",
+                                median.abundance > 500 ~"Runaway",
+                                T ~"Okay"),
+         GR.class = case_when(min.GR >= 1  & max.GR < 100 ~"Positive",
+                              max.GR > 100 ~"unbound" ,
+                              min.GR==0 & max.GR < 100 ~"Null constant",
+                                   T ~"Negative or NA"),
+         Abundance.class = case_when( min.abundance > 0 & max.abundance < 500 ~ "Persisting",
+                                      max.abundance > 500 ~"unbound",
+                                     T ~"Extinct or NA"))
+#save dataset
+write.csv(df.min.abundance , 
+          file = paste0("results/df.min.abundance.csv.gz"))
+df.min.abundance = data.table::fread("results/df.min.abundance.csv.gz")
+head(df.min.abundance)
+str(df.min.abundance)
+df.min.abundance <- df.min.abundance[,-1]
+
+# make it horyzontal
+df.min.abun.horyzontal <- full_join(df.min.abundance[which(df.min.abundance$focal =="Ni"),],
+                                    df.min.abundance[which(df.min.abundance$focal =="Nj"),], suffix = c(".Ni",".Nj"),
+          by=c("function.int","sim","external_factor","function.name")) %>%
+          mutate(comp.com = case_when((Median.class.Ni =="Null" & Median.class.Nj =="Null" )|
+                                       (GR.class.Ni=="Negative or NA" & GR.class.Nj=="Negative or NA") ~"no species",
+                                      
+                                      GR.class.Ni=="Positive" & GR.class.Nj=="Positive" &
+                                      Median.class.Ni =="Okay" & Median.class.Nj =="Okay" ~"two-species community",
+                                      
+                                      (GR.class.Ni=="unbound" | GR.class.Nj=="unbound"|
+                                         Median.class.Ni =="Runaway"|Median.class.Nj =="Runaway"|
+                                         Abundance.class.Ni =="unbound"|Abundance.class.Nj =="unbound") ~ "run away population",
+                                      
+                               T ~"one-species community")) %>%
+  mutate(comp.com = factor(comp.com, levels=c("run away population","no species","one-species community","two-species community")))
+
+
+# visualisation
+my_cols <- c("#AA4499", "#DDCC77","#88CCEE", "#44AA99")
+
+com.comp.plot <- ggplot(df.min.abun.horyzontal[df.min.abun.horyzontal$external_factor =="No external factor",],
+                            aes( x=as.factor(comp.com),
+                                 fill=as.factor(function.name),
+                                 color=as.factor(function.name),
+                                 pattern=as.factor(comp.com))) +
+  geom_bar_pattern(#aes(pattern_fill=function.name),
+    position = position_dodge2(width = 0.9, preserve = "single"),
+    pattern_fill="black",
+    stat="count", 
+    pattern_angle = 45,
+    pattern_density = 0.16, 
+    #pattern_aspect_ratio = 1, 
+    pattern_linetype = 0.5,
+    pattern_key_scale_factor = 1.2,
+    pattern_spacing = 0.05,
+    pattern_size  =20,
+    show.legend = TRUE,
+    pattern_colour  = 'black') +
+   scale_pattern_manual("Community composition",
+                       values=c("no species"="crosshatch","one-species community" = "stripe",
+                                "two-species community" ="none","run away population" ="circle"))+
+  #labels=c("run away population","no species","1-species","2-species")) +
+  scale_color_manual(values = darken(my_cols, amount = .1)) + 
+  #scale_pattern_fill_manual(values = my_cols) + 
+  scale_fill_manual(values = my_cols) + 
+  facet_wrap(.~function.name,nrow=1) +
+  scale_y_continuous(limits=c(0,500), expand = c(0, 0)) +
+  theme_bw() +
+  labs(y="Number of simulated communities", x="")+
+       #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
+  guides(color="none",fill="none",
+         pattern = guide_legend(override.aes = list(fill = "white",
+                                                    color="black", 
+                                                    pattern_spacing=0.01,
+                                                    size=0.5), 
+                                order = 2)) +
+  theme( legend.key.size = unit(1, 'cm'),
+         legend.position = "right",
+         strip.text = element_text(size=20),
+         legend.text=element_text(size=16),
+         legend.title=element_text(size=16),
+         axis.ticks.x=element_blank(),
+         axis.text.x= element_blank(),
+         axis.text.y= element_text(size=20),
+         title=element_text(size=16))
+
+com.comp.plot
+ggsave(com.comp.plot,
+       file = "figures/com.comp.plot.pdf")
+
+# ALL
+com.comp.plot.all <- ggplot(df.min.abun.horyzontal,
+       aes( x=as.factor(function.name),
+            fill=as.factor(function.name),
+            color=as.factor(function.name),
+            pattern=as.factor(comp.com))) +
+  geom_bar_pattern(#aes(pattern_fill=function.name),
+                   position = position_dodge2(width = 0.9, preserve = "single"),
+                   pattern_fill="black",
+                   stat="count", 
+                   pattern_angle = 45,
+                   pattern_density = 0.08, 
+                   pattern_linetype = 0.5,
+                   pattern_spacing = 0.1,
+                   show.legend = TRUE,
+                   pattern_colour  = 'black') +
+  scale_pattern_manual("Community composition",
+                       values=c("no species"="crosshatch","one-species community" = "stripe",
+                               "two-species community" ="none","run away population" ="circle"))+
+                       #labels=c("run away population","no species","1-species","2-species")) +
+  scale_color_manual(values = darken(my_cols, amount = .1)) + 
+  #scale_pattern_fill_manual(values = my_cols) + 
+  scale_fill_manual(values = my_cols) + 
+  facet_wrap(external_factor~.,nrow=3) +
+  scale_y_continuous(limits=c(0,500), expand = c(0, 0)) +
+  theme_bw() +
+  labs(y="Number of simulated communities", x="interaction functions",
+       title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
+  guides(color="none",fill="none",
+         pattern = guide_legend(override.aes = list(fill = "white",
+                                                    color="black", 
+                                                    pattern_spacing=0.01,
+                                                    size=0.5), 
+                                order = 2))+
+  theme( legend.key.size = unit(0.5, 'cm'),
+         legend.position = "bottom",
+         strip.text = element_text(size=20),
+         legend.text=element_text(size=16),
+         legend.title=element_text(size=16),
+         axis.text.x= element_text(size=20),
+         axis.text.y= element_text(size=20),
+         title=element_text(size=16))
+
+com.comp.plot.all
+ggsave(com.comp.plot,
+       file = "figures/com.comp.plot.pdf")
+
+
+# join dataset with full simulation
+df.sim$sim <- df.sim$sim.i
+df.sim.comcomp <- left_join(df.sim,
+                            df.min.abun.horyzontal,
+                            by=c("function.int","sim","external_factor","function.name"))
+
+
+##########################################################################################################
+# 2. minimum  population  size
 ##########################################################################################################
 min.exp.abun <- function(dN,Time,n){ 
   # Time is the time given to reach a particular threshold n
@@ -14,14 +211,12 @@ min.exp.abun <- function(dN,Time,n){
   return(Q)
 }
 df.min.exp.abun <- NULL
+nsims <- 500
 for(i in 1:nsims){
   for( function.int in 1:4){
     for(add_external_factor in c("No external factor","Noisy change","Periodic change")){
       print(paste0("int ", i,"for funct ",function.int, add_external_factor))
-     vec.dNi <- df.sim[which(df.sim$sim.i == i &
-                              df.sim$function.int == function.int &
-                              df.sim$invader =="Ni" &
-                              df.sim$external_factor == add_external_factor),"dNi"]
+     
      vec.dNi.both <- df.sim[which(df.sim$sim.i == i &
                                df.sim$function.int == function.int &
                                df.sim$invader =="both" &
@@ -31,6 +226,10 @@ for(i in 1:nsims){
                                     df.sim$invader =="both" &
                                     df.sim$external_factor == add_external_factor),"dNj"]
      
+     vec.dNi <- df.sim[which(df.sim$sim.i == i &
+                               df.sim$function.int == function.int &
+                               df.sim$invader =="Ni" &
+                               df.sim$external_factor == add_external_factor),"dNi"]
      
      vec.dNj <- df.sim[which(df.sim$sim.i == i &
                                 df.sim$function.int == function.int &
@@ -44,10 +243,10 @@ for(i in 1:nsims){
                 external_factor = add_external_factor,
                 invader = c("both","both","Ni","Nj"),
                 focal = c("Ni","Nj","Ni","Nj"),
-                min.exp.abun = c(min.exp.abun(dN=vec.dNi.both,Time = 100, n=0.05),
-                      min.exp.abun(dN=vec.dNj.both,Time = 100, n=0.05),
-                      min.exp.abun(dN=vec.dNi,Time = 100, n=0.05),
-                      min.exp.abun(dN=vec.dNj,Time = 100, n=0.05)))
+                min.exp.abun = c(min.exp.abun(dN=vec.dNi.both,Time = 100, n=0.001),
+                      min.exp.abun(dN=vec.dNj.both,Time = 100, n=0.001),
+                      min.exp.abun(dN=vec.dNi,Time = 100, n=0.001),
+                      min.exp.abun(dN=vec.dNj,Time = 100, n=0.001)))
      df.min.exp.abun <- bind_rows(df.min.exp.abun,df.min.exp.abun.n)
     }
   }
@@ -58,12 +257,19 @@ df.min.exp.abun <- df.min.exp.abun %>%
                                    function.int==2 ~"2.Linear",
                                    function.int==3 ~"3.Exp",
                                    function.int==4 ~"4.Sigmoid"))
-         
-write.csv(df.sim , 
-          file = paste0("results/df.sim_add_external_factor.csv.gz"))
+    
+ggplot(df.min.exp.abun,
+       aes( y=min.exp.abun, x=invader)) +
+  #geom_density() +
+  facet_wrap(external_factor~function.name) +
+  theme_bw() +
+  geom_boxplot()
+
+write.csv(df.min.exp.abun , 
+          file = paste0("results/df.min.exp.abun.csv.gz"))
 
 ##########################################################################################################
-# 1. Compute slopes of growth over time
+# 3. Compute slopes of growth over time
 ##########################################################################################################
 
 load("results/df.sim.csv.gz")

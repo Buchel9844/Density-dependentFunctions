@@ -12,168 +12,36 @@ library(colorspace)
 library(broom)
 library(truncnorm)
 ###########################################################################################################
-# 1. Compute Low- Density Growth Rates for wide range of parameters without coexistence restriction
-##########################################################################################################
-source("code/PopProjection_toolbox.R")
-
-# define parameters
-nsims <- 2000
-species <- 2
-function.int <- c(1:4)
-t.num = 100
-gen = seq(from=0, to=t.num , by=1)
-# run sim
-set.seed(1608)
-
-# Set parameters lists
-
-white.noise <- function(t.num){
-  e_noise = rnorm(t.num+1,mean=0, sd=0.1) 
-  for( n in 1:sample(2:10)[1]){
-    e_noise[n] <- rnorm(1,mean=0,
-                        sd=abs(rnorm(1, mean=0, sd=1)))
-  }
-  return( e_noise)
-}
-
-params.sens <-list()
-for( i in 1:nsims){
-  params.sens[[i]] <- list(
-    # stable parameters
-    sim= i, 
-    g = c(gi=0.9,gj=0.9), # germination rate of seeds
-    s = c(si= 0.9,sj= 0.9), # survival rate of seeds
-    lambda = c(lambdai= 1 ,lambdaj= 1), # intrinsic fecundity
-    Nmax =matrix(ncol=species, nrow = species, # N optimal, only positive values
-                 data = round(abs(runif(species*species, max=10, min = 0))),
-                 dimnames = list(c("i", "j"),
-                                 c("i", "j"))),
-    # variable parameters
-    a_slope = matrix(ncol=species, nrow = species, # a_slope, only negative values
-                     data = runif(n=species*species, min=-1, max=0),
-                     dimnames = list(c("i", "j"),
-                                     c("i", "j"))),
-    
-    a_initial = matrix(ncol=species, nrow = species, # a_slope, only negative values
-                       data = runif(n=species*species, min=-1, max=0),
-                       dimnames = list(c("i", "j"),
-                                       c("i", "j"))),
-    
-    c =matrix(ncol=species, nrow = species, # a_slope, only positive values
-              data =runif(n=species*species, min=-1, max=0),
-              dimnames = list(c("i", "j"),
-                              c("i", "j"))),
-    
-    e_seasonal = sin((2*pi/20)*gen)*abs(rnorm(1,mean=0, sd=0.1)),
-    e_noise = white.noise(t.num)
-    
-  )
-}
-
-
-df.sim.sens  <- NULL
-
-t.num = 100 # number of generation
-set.seed(1608)
-for(i in 1:nsims){
-  for( function.int in 1:4){
-    for(add_external_factor in c("none")){
-      print(paste0("int ", i,"for funct ",function.int, add_external_factor))
-      df.n <- NULL
-      p <- params.sens[[i]]
-      df.n <- as.data.frame(params.sens[[i]][c("sim","Nmax","a_slope","a_initial","c")]) %>%
-        mutate(focal = c("i","j"))  %>%
-        reshape2::melt(id.vars="focal")   %>%
-        mutate( vars = paste(variable ,focal,sep=".")) %>%
-        dplyr::select( value, vars) %>%
-        spread(key=vars, value=value) %>%
-        mutate(function.int  = function.int ) # attention!!! identity of the focal is the last suffixes
-      
-      df.inv <- NULL
-      df.inv <- GrowthSimInv(par.dat = p, t.num  = t.num,
-                             function.int,
-                             add_external_factor) %>%# simulation of invasion for both species
-        bind_cols(df.n) 
-      
-      df.initc <- Ricker_solution(state = c(1,1), pars= p, gens=t.num,
-                                  function.int,add_external_factor) %>% # simulation of initial condition = 1,1
-        mutate(invader = "both") %>%
-        bind_cols(df.n) %>% 
-        bind_rows(df.inv)%>% 
-        mutate(external_factor= add_external_factor)
-      
-      for(inv in c("both","Ni","Nj")){ # compute stability metric
-        df.sens.n <- df.initc %>%
-          filter(invader == inv) %>%
-          mutate( stability.i = mean(Ni)/var(Ni),
-                  stability.j = mean(Nj)/var(Nj)) %>%
-          mutate( stability.i = case_when(mean(Ni) < 0.10~0,
-                                          T~stability.i),
-                  stability.j = case_when(mean(Nj) < 0.10~0,
-                                          T~stability.j))
-        
-        df.sim.sens <- bind_rows(df.sim.sens, df.sens.n)
-      }
-    }
-  }
-}
-
-# save .csv
-df.sim.sens <- df.sim.sens %>%
-  mutate(function.name = case_when(function.int==1 ~"1.Constant",
-                                   function.int==2 ~"2.Linear",
-                                   function.int==3 ~"3.Exp",
-                                   function.int==4 ~"4.Sigmoid"
-                                   ))
-
-write.csv(df.sim.sens , 
-          file = paste0("results/df.sim_sens.csv.gz"))
-load("results/df.sim.csv.gz")
-df.sim.sens = fread("results/df.sim_sen.csv.gz")
-head(df.sim)
-
-###########################################################################################################
-# 3. Visualise of abundance over time with stability
-##########################################################################################################
-sim = 100
-t.num= 100
-#---- Abundance through time with external factors----
-
-example.abundance.sens <- df.sim.sens[which(df.sim.sens$sim.i == sim &
-                                                       df.sim.sens$invader == "both"),] %>%
-  gather(Ni, Nj, key=species, value=abundance) %>%
-  ggplot(aes(x=time)) +
-  geom_line(aes(y= abundance,color=species)) +
-  geom_line(aes(y= external.fact),color="black") +
-  theme_bw() + 
-  scale_color_manual(values=c("#332288", "#999933")) +
-  scale_fill_manual(values=c("#332288", "#999933")) +
-  facet_wrap(. ~ function.name,nrow=2,ncol=2,
-             scales="free") #+
-  #annotate(geom="text",aes(label=stability.i),size=1,x=1,y=1) +
-  
-example.abundance.sens
-ggsave(example.abundance.sens,
-       file = "figures/example.abundance.sens.pdf")
-###########################################################################################################
-# 3. Scale parameters for sensitivity analysis
+# 1. Scale parameters for sensitivity analysis
 ###########################################################################################################
 
-df.sim.sens.std.unscale <- df.sim.sens %>%
-  filter(time==100)
-df.sim.sens.std.unscale <- data.frame(function.int = c(df.sim.sens.std.unscale$function.int,df.sim.sens.std.unscale$function.int),
-           function.name =c(df.sim.sens.std.unscale$function.name,df.sim.sens.std.unscale$function.name),
-           stability =c(df.sim.sens.std.unscale$stability.i,df.sim.sens.std.unscale$stability.j),
-           alpha.decay.intra = c(df.sim.sens.std.unscale$a_slope.i.i,df.sim.sens.std.unscale$a_slope.j.j),
-           alpha.decay.inter = c(df.sim.sens.std.unscale$a_slope.i.j,df.sim.sens.std.unscale$a_slope.j.i),
-           alpha.0.intra = c(df.sim.sens.std.unscale$a_initial.i.i,df.sim.sens.std.unscale$a_initial.j.j),
-           alpha.0.inter = c(df.sim.sens.std.unscale$a_initial.i.j,df.sim.sens.std.unscale$a_initial.j.i),
-           C.intra = c(df.sim.sens.std.unscale$c.i.i,df.sim.sens.std.unscale$c.j.j), 
-           C.inter = c(df.sim.sens.std.unscale$c.i.j,df.sim.sens.std.unscale$c.j.i),
-           N.opt.intra = c(df.sim.sens.std.unscale$Nmax.i.i,df.sim.sens.std.unscale$Nmax.j.j),
-           N.opt.inter = c(df.sim.sens.std.unscale$Nmax.i.j,df.sim.sens.std.unscale$Nmax.j.i))
+df.sim.sens.std.unscale <- data.frame(function.int = c(df.stability.summary.small$function.int,df.stability.summary.small$function.int),
+           function.name =c(df.stability.summary.small$function.name,df.stability.summary.small$function.name),
+           stability =c(df.stability.summary.small$ratio.i,df.stability.summary.small$ratio.j),
+           alpha.decay.intra = c(df.stability.summary.small$a_slope.i.i,df.stability.summary.small$a_slope.j.j),
+           alpha.decay.inter = c(df.stability.summary.small$a_slope.i.j,df.stability.summary.small$a_slope.j.i),
+           alpha.0.intra = c(df.stability.summary.small$a_initial.i.i,df.stability.summary.small$a_initial.j.j),
+           alpha.0.inter = c(df.stability.summary.small$a_initial.i.j,df.stability.summary.small$a_initial.j.i),
+           C.intra = c(df.stability.summary.small$c.i.i,df.stability.summary.small$c.j.j), 
+           C.inter = c(df.stability.summary.small$c.i.j,df.stability.summary.small$c.j.i),
+           N.opt.intra = c(df.stability.summary.small$Nmax.i.i,df.stability.summary.small$Nmax.j.j),
+           N.opt.inter = c(df.stability.summary.small$Nmax.i.j,df.stability.summary.small$Nmax.j.i),
+           comp.com =c(df.stability.summary.small$comp.com,df.stability.summary.small$comp.com),
+           min.GR =c(df.stability.summary.small$min.GR.Ni,df.stability.summary.small$min.GR.Nj),
+           min.abundance =c(df.stability.summary.small$min.abundance.Ni,df.stability.summary.small$min.abundance.Nj))
 
-ggplot(df.sim.sens.std.unscale, aes(x=stability, group=function.int, color=function.int ))+ geom_density()
+ggplot(df.sim.sens.std.unscale, aes(y= stability , 
+                                    x=as.factor(function.int),
+                                    color=function.int ))+ 
+  geom_boxplot()  +
+  ylim(c(0,100))
+
+ggplot(df.sim.sens.std.unscale, aes(y= stability , 
+                                    x=as.factor(function.int),
+                                    color=function.int ))+ 
+  geom_boxplot()  +
+  ylim(c(0,100))
+
 stand.variable <- c("alpha.decay.intra","alpha.decay.inter",
                     "alpha.0.intra","alpha.0.inter",
                     "C.intra","C.inter",
@@ -189,6 +57,7 @@ df.sim.sens.std[,stand.variable] <- lapply(df.sim.sens.std.unscale[,stand.variab
 #---- Sensitivity analysis -----
 df.sim.sens.std <- df.sim.sens.std %>%
   mutate(stability = case_when(stability > 100 ~ 100,
+                               is.na(stability) ~ 0,
                                T~stability),
          function.int = as.factor(function.int))
 
@@ -212,7 +81,7 @@ model.3 <- glm(formula(paste0("stability ~ ",
                                      "N.opt.intra","N.opt.inter"),collapse = "+"))), 
               data = df.sim.sens.std[which(df.sim.sens.std$function.int==3),])
 
-model.4 <- glm(formula(paste0("stability ~ ",
+model.4 <- glm(formula(paste0("stability~ ",
                              paste(c("alpha.0.intra","alpha.0.inter",
                                      "alpha.decay.intra","alpha.decay.inter",
                                      "C.intra","C.inter",
@@ -258,7 +127,7 @@ predict_sensitivity_plot <- predict %>%
   scale_color_manual(values = darken(my_cols, amount = .1)) + 
   scale_fill_manual(values = my_cols) + 
   facet_wrap(~term,nrow = 2,dir="v",scales="free") +
-  scale_y_continuous(limits=c(0,100))+
+  scale_y_continuous(limits=c(0,100)) +
   theme(legend.background = element_rect(color = "white"),
         legend.position ="right",
         legend.text = element_text(size = 10),

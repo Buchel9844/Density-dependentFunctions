@@ -19,10 +19,10 @@ data{
 
 parameters{
   vector<lower=0,upper =1>[1] lambdas; // intrinsic growth rate - always positive
-  vector<lower=-1,upper =0>[S] c; //stretching parameters
+  vector<lower=-0.5,upper =0.5>[S] c; //stretching parameters
 
-  vector<lower=-1,upper =0>[S] alpha_initial; // initial effect of j on i - when Nj is minimal
-  vector<lower=-1,upper =0>[S] alpha_slope; // decay - impact of the addition of one individual of j, on the fecundity of i. 
+  vector<lower=-1,upper =1>[S] alpha_initial; // initial effect of j on i - when Nj is minimal
+  vector<lower=-0.5,upper =0.5>[S] alpha_slope; // decay - impact of the addition of one individual of j, on the fecundity of i. 
 
     
   real<lower=0> disp_dev; // species-specific dispersion deviation parameter,
@@ -49,28 +49,27 @@ transformed parameters{
     lambda_ei[i] = U*lambdas[1];
     for(s in 1:S){
     //scaling factor
-    //alpha_slope_ei[s] = alpha_slope[s] - 0.5; //scaling to have higher values
-    //c_ei[s] = c[s] + 0.5;
+    alpha_slope_ei[s] = alpha_slope[s] - 0.5; //scaling to have higher values
+    c_ei[s] = c[s] - 0.5;
       if(alphaFunct1 ==1){
       alpha_value[i,s]= alpha_initial[s];
       alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct2 ==1){
-       alpha_value[i,s] = alpha_initial[s] + alpha_slope[s]*(SpMatrix[i,s]-Nmax[s]);
+       alpha_value[i,s] = alpha_initial[s] +  alpha_slope_ei[s]*(SpMatrix[i,s]-Nmax[s]);
       alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct3 ==1){
-         alpha_value[i,s] = alpha_initial[s] + c[s]*(1 - exp(alpha_slope[s]*(SpMatrix[i,s]-Nmax[s])));
+         alpha_value[i,s] = alpha_initial[s] + c_ei[s]*(1 - exp( alpha_slope_ei[s]*(SpMatrix[i,s]-Nmax[s])));
       alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct4 ==1){
-         alpha_value[i,s]= alpha_initial[s] + (c[s]*(1 - exp(alpha_slope[s]*(SpMatrix[i,s]-Nmax[s]))))/(1+exp(alpha_slope[s]*(SpMatrix[i,s]-Nmax[s])));
+         alpha_value[i,s]= alpha_initial[s] + (c_ei[s]*(1 - exp( alpha_slope_ei[s]*(SpMatrix[i,s]-Nmax[s]))))/(1+exp( alpha_slope_ei[s]*(SpMatrix[i,s]-Nmax[s])));
       alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
     }
     
  F_hat[i] = exp(lambda_ei[i] + sum(alpha_function_eij[i,]));
-
 
   }
 
@@ -94,7 +93,7 @@ generated quantities{
   vector[N] F_sim;
     if(run_estimation==1){
  for(i in 1:N){
-    if(Fecundity[i] <= 0) break ;
+    if(F_hat[i] <= 0) break ;
     F_sim[i] = neg_binomial_2_lpmf(Fecundity[i]|F_hat[i],(disp_dev^2)^(-1));
               }
     }

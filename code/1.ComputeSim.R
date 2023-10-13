@@ -19,7 +19,7 @@ library(data.table) # write csv.gz
 library(ppcor) # partial correlation value
 
 ###########################################################################################################
-# 1. Compute Low- Density Growth Rates for wide range of parameters
+# 1. # 1. Compute Low- Density Growth Rates for wide range of parameters without coexistence restriction
 ##########################################################################################################
 source("code/PopProjection_toolbox.R")
 
@@ -52,7 +52,9 @@ white.noise <- function(t.num){
 }
 
 params <-list()
-for( i in 1:nsims){
+i=1
+for( n in 1:10000){
+  if(i==nsims+1) next
     params[[i]] <- list(
                 # stable parameters
                     sim= i, 
@@ -69,7 +71,10 @@ for( i in 1:nsims){
                                   dimnames = list(c("i", "j"),
                                                   c("i", "j"))),
                     
-                    a_initial = alpha.coexistence(species),
+                    a_initial = matrix(ncol=species, nrow = species, # a_slope, only negative values
+                                       data = rtruncnorm(n=species*species, mean=-0.2, sd=0.5, a=-1, b=1),
+                                       dimnames = list(c("i", "j"),
+                                                       c("i", "j"))),
               
                     c =matrix(ncol=species, nrow = species, 
                                      data =runif(n=species*species, min=-1, max=0),
@@ -80,10 +85,10 @@ for( i in 1:nsims){
                     e_noise = white.noise(t.num)
                   
                     )
-    if(params[[i]]$a_initial[1,1]*params[[i]]$a_initial[2,2] < 
-       params[[i]]$a_initial[1,2]*params[[i]]$a_initial[2,1]){
-      nsims = nsims - 1}
-
+    if(params[[i]]$a_initial[1,1] > 0 | params[[i]]$a_initial[2,2] > 0){
+      i = i}else{
+        i = i + 1
+      }
 }
 
 
@@ -138,9 +143,15 @@ df.sim <- df.sim %>%
 write.csv(df.sim , 
           file = paste0("results/df.sim_add_external_factor.csv.gz"))
 load("results/df.sim.csv.gz")
-df.sim = fread("results/df.sim.csv.gz")
+df.sim = data.table::fread("results/df.sim_add_external_factor.csv.gz")
 head(df.sim)
+str(df.sim)
+df.sim <- df.sim[,-1]
 
+df.sim$dNi <- as.numeric(df.sim$dNi)
+df.sim$dNj <- as.numeric(df.sim$dNj)
+df.sim$Ni <- as.numeric(df.sim$Ni)
+df.sim$Nj <- as.numeric(df.sim$Nj)
 
 
 ##########################################################################################################
@@ -150,8 +161,9 @@ sim = 100
 t.num= 100
 #---- Abundance through time with external factors----
   
-example.abundance.external.fact <- df.sim[which(df.sim$sim.i == sim &
-               df.sim$invader == "both"),] %>%
+example.abundance.external.fact <- df.sim[which(df.sim$sim.i == 2 &
+                                                df.sim$time < 51 &
+                                                df.sim$invader == "both"),] %>%
   gather(Ni, Nj, key=species, value=abundance) %>%
   ggplot(aes(x=time)) +
   geom_line(aes(y= abundance,color=species)) +
@@ -160,22 +172,91 @@ example.abundance.external.fact <- df.sim[which(df.sim$sim.i == sim &
   scale_color_manual(values=c("#332288", "#999933")) +
   scale_fill_manual(values=c("#332288", "#999933")) +
   facet_wrap(external_factor ~ function.name ,nrow=3,
-             scales="free")
+             scales="free")+
+  labs(title = "Abundance over time of a two-species communities, for one set of parameters,\nfitted in each interaction function respectively",
+       y="Local abundance",
+       x="Time")+
+  theme( legend.key.size = unit(1, 'cm'),
+         strip.text = element_text(size=20),
+         legend.text=element_text(size=20),
+         legend.title=element_text(size=20),
+         axis.text.x= element_text(size=16),
+         axis.text.y= element_text(size=16),
+         #axis.title.y= element_text(size=16),
+         title=element_text(size=25))
 example.abundance.external.fact
 ggsave(example.abundance.external.fact,
        file = "figures/example.abundance.external.fact.pdf")
 
 
+#---- Abundance through time no external factors , two simulations ----
+
+example.abundance.runawaysim.list <- list()
+for(n in c(4,17,67)){
+example.abundance.runawaysim.list[[as.character(n)]] <- df.sim[which((df.sim$sim.i == n) &
+                                                  df.sim$time < 51 &
+                                                  df.sim$external_factor == "No external factor" &
+                                                  df.sim$invader == "both"),] %>%
+  gather(Ni, Nj, key=species, value=abundance) %>%
+  ggplot(aes(x=time)) +
+  geom_line(aes(y= abundance,color=species)) +
+  geom_line(aes(y= external.fact),color="black") +
+  theme_bw() + 
+  facet_wrap(.~function.name,nrow=1,scales="free")+
+  scale_color_manual(values=c("#332288", "#999933")) +
+  scale_fill_manual(values=c("#332288", "#999933")) +
+  labs(y="",
+       x="") +
+  theme( legend.key.size = unit(1, 'cm'),
+         strip.text = element_text(size=20),
+         legend.text=element_text(size=20),
+         legend.title=element_text(size=20),
+         axis.text.x= element_text(size=16),
+         axis.text.y= element_text(size=16),
+         #axis.title.y= element_text(size=16),
+         title=element_text(size=25))
+}
+example.abundance.runawaysim
+
+#######Graph A&B##################
+
+example.abundance.runawaysim <-  ggpubr::ggarrange(plotlist = example.abundance.runawaysim.list, 
+                                          ncol=1, nrow=3,
+                                          labels=c("Runaway dynamics", 
+                                                   "One-species community",
+                                                   "Two-species community"),
+                            align = "v",
+                            hjust=-0.3,
+                            vjust = -0.5,    
+                            font.label = list(size = 20, color = "black", 
+                                              face = "bold", family = NULL, position = "top"),
+                            common.legend=T, legend="right") +
+  theme(plot.margin = margin(1.5,0.1,0.2,0.1, "cm")) 
+
+library(grid)
+example.abundance.runawaysim <- annotate_figure(example.abundance.runawaysim, 
+                                                top= textGrob("Abundance over time of a two-species communities, for one set of parameters,\nfitted in each interaction function respectively",  
+                                                              gp = gpar(fontsize=20, cex = 1.3)),
+                                                left = textGrob("Local abundance", 
+                                                                rot = 90, vjust = 3, 
+                                                                gp = gpar(fontsize=18,cex = 1.3)),
+                                  bottom = textGrob("Time", hjust = 0,vjust=-1.5, 
+                                                    gp = gpar(fontsize=18,cex = 1.3)))
+example.abundance.runawaysim
+
+ggsave(example.abundance.runawaysim,
+       file = "figures/example.abundance.runawaysim.pdf")
+
+
+
+
 #---- Abundance through time for all scenario----
+df.min.abundance[which(df.min.abundance$sim.i ==sim &
+                         df.min.abundance$function.int == 4  &
+                         df.min.abundance$external_factor  =="No external factor"),] 
 
-GRWL <- df.sim.std[which(df.sim$sim.i == 16 &
-                   df.sim$function.int == 4 &
-                     df.sim$external_factor  =="No external factor"),] %>%
-  select(GRWL_i,GRWL_j,invader) %>%
-  unique()
-
-example.abundance.scenarios <- df.sim.std[which(df.sim$sim.i == 16 &
-                                                       df.sim$function.int == 4 &
+example.abundance.scenarios <- df.sim[which(df.sim$sim.i ==sim &
+                                                       df.sim$function.int == 4  &
                                               df.sim$external_factor  =="No external factor"),] %>%  
   gather(Ni, Nj, key=species, value=abundance) %>%
   ggplot(aes(y=abundance, x=time)) + #geom_point() +
