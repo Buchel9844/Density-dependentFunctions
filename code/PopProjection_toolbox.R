@@ -23,8 +23,36 @@ alpha_function4  <- function(Amin, Aslopes,c,N,N0){
   
   return(alpha)
 }
-Ricker_solution_ODE<- function(t, state, pars){
-  with(as.list(c(state, pars)), {
+Ricker_solution_withalpha <- function(gens,
+                                     state,
+                                     pars,
+                                     function.int,
+                                     add_external_factor) {
+  Nmax <- pars$Nmax # density at which fecundity is max - effect of neighbors is 0
+  g <- pars$g # germination rate 
+  s <- pars$s #seed survival
+  lambda <- pars$lambda # intrinsic growth rate
+  a_initial <- pars$a_initial # which int.function
+  a_slope <- pars$a_slope # which int.function
+  c <- pars$c # which int.function
+  
+  df <- data.frame( t=0:gens,  Ni=numeric(1+gens),  Nj =numeric(1+gens) ,
+                    dNi=numeric(1+gens),  dNj =numeric(1+gens) )
+  df[1,2:3] <- c(state[1],state[2]) #species i initial densities
+  
+  if(add_external_factor =="none"){
+    e <- rep(0,times=gens)
+  }
+  if(add_external_factor =="season"){
+    e <- pars$e_seasonal
+  }
+  if(add_external_factor =="noise"){
+    e <- pars$e_noise
+  }
+  for(t in 1:gens){
+    
+    Ni <- df[t,"Ni"] # species i densities
+    Nj <- df[t,"Nj"] # species j  densities
     
     if(function.int==1){
       aii <- a_initial[1,1]
@@ -55,11 +83,20 @@ Ricker_solution_ODE<- function(t, state, pars){
     Fi <-  exp(lambda[1] + aii * g[1]*Ni + aij *g[2]*Nj + e[t])
     Fj <-  exp(lambda[2] + ajj * g[2]*Nj + aji *g[1]*Ni + e[t])
     
-    Ni.diff <- ((1-g[1]) * s[1] + g[1] * Fi)*Ni 
-    Nj.diff <- ((1-g[2]) * s[2] + g[2] * Fj)*Nj
-    return(list(c(x = Ni.diff, y = Nj.diff)))
-    })
+    Nit1 <- ((1-g[1]) * s[1] + g[1] * Fi)*Ni 
+    Njt1 <- ((1-g[2]) * s[2] + g[2] * Fj)*Nj
+    Nidt <- Nit1/Ni
+    Njdt <- Njt1/Nj
+    
+    df[t,4:5] <- c(Nidt, Njdt)
+    df[t,6:9] <- c(aii,ajj,aij,aji)
+    df[t+1,2:3] <- c(Nit1, Njt1)
+  }
+  df[c(1:length(e)),10] <- c(e)
+  names(df) <- c("time","Ni","Nj","dNi","dNj","aii","ajj","aij","aji","external.fact")
+  return(df)
 }
+
 
 Ricker_solution <- function(gens,
                                 state,
@@ -131,65 +168,6 @@ Ricker_solution <- function(gens,
   }
   df[c(1:length(e)),6] <- c(e)
   names(df) <- c("time","Ni","Nj","dNi","dNj","external.fact")
-  return(df)
-}
-
-Ricker_solution_NatData <- function(gens,
-                                   state,
-                                   pars) {
-  function.int <- pars$function.int[1]
-  Nmax <- pars$Nmax # density at which fecundity is max - effect of neighbors is 0
-  g <- pars$g # germination rate 
-  s <- pars$s #seed survival
-  lambda <- pars$lambda # intrinsic growth rate
-  a_initial <- pars$alpha_init # which int.function
-  a_slope <- pars$alpha_slope # which int.function
-  c <- pars$alpha_c # which int.function
-  neigh <- levels(as.factor(pars$neigh)) # number of neighbours
-  n.neigh <- length(neigh) 
-  focal <- levels(as.factor(pars$focal)) # number of focal
-  n.focal <- length(focal)
-  position <- c(!neigh %in% focal)
-  
-  
-  position.df <- 1:n.focal*n.neigh # position of parameter for each focal in the data.frame
-  
-  df <- data.frame(matrix(data= rep(NA,each=(1+gens)*n.neigh),
-                          ncol=n.neigh, nrow=1+gens))
-  names(df) <- c(paste0("N",1:n.neigh))
-  df[1,] <- state #species i initial densities
-  df[,position] <- state
-
-  for(t in 1:gens){
-    Nt1 <- c()
-    Fec <- c()
-    Nt <- df[t,!position]  # species i densities
-    for( n in 1:n.focal){
-      low = position.df[n]-(n.neigh - 1)
-      up = position.df[n]
-    if(function.int==1){
-      a <- a_initial[low:up]
-    }
-    if(function.int==2){
-      a <- alpha_function2(a_initial[low:up], a_slope[low:up],g*Nt, Nmax[low:up])
-    }
-    if(function.int==3){
-      a <- alpha_function3(a_initial[low:up], a_slope[low:up],c[low:up],g*Nt, Nmax[low:up])
-    }
-    if(function.int==4){
-      a <- alpha_function4(a_initial[low:up], a_slope[low:up],c[low:up],g*Nt, Nmax[low:up])
-    }
-  
-    Fec[n] <- exp(lambda[position.df[n]] + sum(a*g*Nt))
-    
-    Nt1[n] <- ((1-g) * s + g* Fec[n])*Nt[n]
-    
-    }
-    df[t+1,!position] <- c(Nt1)
-
-  }
-  names(df) <- c(neigh)
-  df$time <- c(0:gens) 
   return(df)
 }
 
@@ -273,6 +251,64 @@ Ricker_solution_mono <- function(gens,
 }
 
 
+Ricker_solution_NatData <- function(gens,
+                                    state,
+                                    pars) {
+  function.int <- pars$function.int[1]
+  Nmax <- pars$Nmax # density at which fecundity is max - effect of neighbors is 0
+  g <- pars$g # germination rate 
+  s <- pars$s #seed survival
+  lambda <- pars$lambda # intrinsic growth rate
+  a_initial <- pars$alpha_init # which int.function
+  a_slope <- pars$alpha_slope # which int.function
+  c <- pars$alpha_c # which int.function
+  neigh <- levels(as.factor(pars$neigh)) # number of neighbours
+  n.neigh <- length(neigh) 
+  focal <- levels(as.factor(pars$focal)) # number of focal
+  n.focal <- length(focal)
+  position <- c(!neigh %in% focal)
+  
+  
+  position.df <- 1:n.focal*n.neigh # position of parameter for each focal in the data.frame
+  
+  df <- data.frame(matrix(data= rep(NA,each=(1+gens)*n.neigh),
+                          ncol=n.neigh, nrow=1+gens))
+  names(df) <- c(paste0("N",1:n.neigh))
+  df[1,] <- state #species i initial densities
+  df[,position] <- state
+  
+  for(t in 1:gens){
+    Nt1 <- c()
+    Fec <- c()
+    Nt <- df[t,!position]  # species i densities
+    for( n in 1:n.focal){
+      low = position.df[n]-(n.neigh - 1)
+      up = position.df[n]
+      if(function.int==1){
+        a <- a_initial[low:up]
+      }
+      if(function.int==2){
+        a <- alpha_function2(a_initial[low:up], a_slope[low:up],g*Nt, Nmax[low:up])
+      }
+      if(function.int==3){
+        a <- alpha_function3(a_initial[low:up], a_slope[low:up],c[low:up],g*Nt, Nmax[low:up])
+      }
+      if(function.int==4){
+        a <- alpha_function4(a_initial[low:up], a_slope[low:up],c[low:up],g*Nt, Nmax[low:up])
+      }
+      
+      Fec[n] <- exp(lambda[position.df[n]] + sum(a*g*Nt))
+      
+      Nt1[n] <- ((1-g) * s + g* Fec[n])*Nt[n]
+      
+    }
+    df[t+1,!position] <- c(Nt1)
+    
+  }
+  names(df) <- c(neigh)
+  df$time <- c(0:gens) 
+  return(df)
+}
 # function modified from https://github.com/laurenmh/avena-erodium/blob/master/invader_resident_comparison.R
 
 GrowthSimInv = function(par.dat, t.num,function.int,add_external_factor) {

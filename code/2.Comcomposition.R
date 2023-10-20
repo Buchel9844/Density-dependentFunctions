@@ -10,24 +10,18 @@ for(i in 1:nsims){
   for( function.int in 1:4){
     for(add_external_factor in c("No external factor","Noisy change","Periodic change")){
       print(paste0("int ", i,"for funct ",function.int, add_external_factor))
+      df.min.abundance.n <- df.sim[which(df.sim$sim.i == i &
+                        df.sim$function.int == function.int &
+                        df.sim$external_factor == add_external_factor),]
       
-      vec.abundance.Ni <- df.sim$Ni[which(df.sim$sim.i == i &
-                                df.sim$function.int == function.int &
-                                df.sim$external_factor == add_external_factor)]
-      
-      vec.abundance.Nj <- df.sim$Nj[which(df.sim$sim.i == i &
-                                         df.sim$function.int == function.int &
-                                         df.sim$external_factor == add_external_factor)]
-      
-      vec.GR.Ni <- df.sim$dNi[which(df.sim$sim.i == i &
-                                         df.sim$function.int == function.int &
-                                         df.sim$external_factor == add_external_factor)]
-      vec.GR.Nj <- df.sim$dNj[which(df.sim$sim.i == i &
-                                         df.sim$function.int == function.int &
-                                         df.sim$external_factor == add_external_factor)]
+      vec.abundance.Ni <- df.min.abundance.n$Ni
+      vec.abundance.Nj <- df.min.abundance.n$Nj
+      vec.GR.Ni <- df.min.abundance.n$dNi
+      vec.GR.Nj <- df.min.abundance.n$dNj
        
-      
+  
       df.min.abun.n <- data.frame(sim = i,
+                                  a_initial.inter = c(df.min.abundance.n$a_initial.i.j[1],df.min.abundance.n$a_initial.j.i[1]),
                                  function.int= function.int,
                                 external_factor = add_external_factor,
                                 focal = c("Ni","Nj"),
@@ -62,6 +56,7 @@ df.min.abundance  <- df.min.abundance  %>%
          Abundance.class = case_when( min.abundance > 0 & max.abundance < 500 ~ "Persisting",
                                       max.abundance > 500 ~"unbound",
                                      T ~"Extinct or NA"))
+         
 #save dataset
 write.csv(df.min.abundance , 
           file = paste0("results/df.min.abundance.csv.gz"))
@@ -85,55 +80,46 @@ df.min.abun.horyzontal <- full_join(df.min.abundance[which(df.min.abundance$foca
                                          Abundance.class.Ni =="unbound"|Abundance.class.Nj =="unbound") ~ "run away population",
                                       
                                T ~"one-species community")) %>%
+  mutate(Interspecific.interaction = case_when(a_initial.inter.Ni > 0 &
+                                                 a_initial.inter.Nj  >0 ~ "facilitation",
+                                               a_initial.inter.Ni < 0 &
+                                                 a_initial.inter.Nj  < 0 ~ "competition",
+                                               T~"both")) %>%
   mutate(comp.com = factor(comp.com, levels=c("run away population","no species","one-species community","two-species community")))
 
 
 # visualisation
-my_cols <- c("#AA4499", "#DDCC77","#88CCEE", "#44AA99")
-
+#my_cols <- c("#AA4499", "#DDCC77","#88CCEE", "#44AA99")
+cols_interaction <- c( "#DDCC77","#661100","#117733")
 com.comp.plot <- ggplot(df.min.abun.horyzontal[df.min.abun.horyzontal$external_factor =="No external factor",],
                             aes( x=as.factor(comp.com),
-                                 fill=as.factor(function.name),
-                                 color=as.factor(function.name),
-                                 pattern=as.factor(comp.com))) +
-  geom_bar_pattern(#aes(pattern_fill=function.name),
-    position = position_dodge2(width = 0.9, preserve = "single"),
-    pattern_fill="black",
-    stat="count", 
-    pattern_angle = 45,
-    pattern_density = 0.16, 
-    #pattern_aspect_ratio = 1, 
-    pattern_linetype = 0.5,
-    pattern_key_scale_factor = 1.2,
-    pattern_spacing = 0.05,
-    pattern_size  =20,
-    show.legend = TRUE,
-    pattern_colour  = 'black') +
-   scale_pattern_manual("Community composition",
-                       values=c("no species"="crosshatch","one-species community" = "stripe",
-                                "two-species community" ="none","run away population" ="circle"))+
+                                 fill=as.factor(Interspecific.interaction),
+                                 color=as.factor(Interspecific.interaction) )) +
+
+  geom_bar()+
   #labels=c("run away population","no species","1-species","2-species")) +
-  scale_color_manual(values = darken(my_cols, amount = .1)) + 
+  scale_color_manual(values = darken(cols_interaction, amount = .1)) + 
   #scale_pattern_fill_manual(values = my_cols) + 
-  scale_fill_manual(values = my_cols) + 
+  scale_fill_manual(
+  values = cols_interaction) + 
   facet_wrap(.~function.name,nrow=1) +
   scale_y_continuous(limits=c(0,500), expand = c(0, 0)) +
+  scale_x_discrete(labels = c("run away","no species","one-species","two-species")) +
   theme_bw() +
-  labs(y="Number of simulated communities", x="")+
+  labs(y="Number of simulated communities", x="",
+       fill=expression(paste("Initial interaction value ", alpha['0,i,j'])))+
        #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
-  guides(color="none",fill="none",
-         pattern = guide_legend(override.aes = list(fill = "white",
-                                                    color="black", 
-                                                    pattern_spacing=0.01,
-                                                    size=0.5), 
-                                order = 2)) +
+  guides(color="none") +
   theme( legend.key.size = unit(1, 'cm'),
-         legend.position = "right",
+         legend.position = "bottom",
+         strip.background = element_blank(),
+         panel.grid.minor = element_blank(),
+         panel.grid.major.x = element_blank(),
          strip.text = element_text(size=20),
          legend.text=element_text(size=16),
          legend.title=element_text(size=16),
-         axis.ticks.x=element_blank(),
-         axis.text.x= element_blank(),
+         #axis.ticks.x=element_blank(),
+         axis.text.x= element_text(size=16, angle=66, hjust=1),
          axis.text.y= element_text(size=20),
          title=element_text(size=16))
 
@@ -143,44 +129,34 @@ ggsave(com.comp.plot,
 
 # ALL
 com.comp.plot.all <- ggplot(df.min.abun.horyzontal,
-       aes( x=as.factor(function.name),
-            fill=as.factor(function.name),
-            color=as.factor(function.name),
-            pattern=as.factor(comp.com))) +
-  geom_bar_pattern(#aes(pattern_fill=function.name),
-                   position = position_dodge2(width = 0.9, preserve = "single"),
-                   pattern_fill="black",
-                   stat="count", 
-                   pattern_angle = 45,
-                   pattern_density = 0.08, 
-                   pattern_linetype = 0.5,
-                   pattern_spacing = 0.1,
-                   show.legend = TRUE,
-                   pattern_colour  = 'black') +
-  scale_pattern_manual("Community composition",
-                       values=c("no species"="crosshatch","one-species community" = "stripe",
-                               "two-species community" ="none","run away population" ="circle"))+
-                       #labels=c("run away population","no species","1-species","2-species")) +
-  scale_color_manual(values = darken(my_cols, amount = .1)) + 
+                            aes( x=as.factor(comp.com),
+                                 fill=as.factor(Interspecific.interaction),
+                                 color=as.factor(Interspecific.interaction) )) +
+  
+  geom_bar()+
+  #labels=c("run away population","no species","1-species","2-species")) +
+  scale_color_manual(values = darken(cols_interaction, amount = .1)) + 
   #scale_pattern_fill_manual(values = my_cols) + 
-  scale_fill_manual(values = my_cols) + 
-  facet_wrap(external_factor~.,nrow=3) +
+  scale_fill_manual(
+    values = cols_interaction) + 
+  #scale_pattern_fill_manual(values = my_cols) + 
+  facet_wrap(external_factor~function.name,nrow=3) +
   scale_y_continuous(limits=c(0,500), expand = c(0, 0)) +
   theme_bw() +
-  labs(y="Number of simulated communities", x="interaction functions",
-       title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
-  guides(color="none",fill="none",
-         pattern = guide_legend(override.aes = list(fill = "white",
-                                                    color="black", 
-                                                    pattern_spacing=0.01,
-                                                    size=0.5), 
-                                order = 2))+
-  theme( legend.key.size = unit(0.5, 'cm'),
+  labs(y="Number of simulated communities", x="",
+       fill=expression(paste("Initial interaction value ", alpha['0,i,j'])))+
+  #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
+  guides(color="none") +
+  theme( legend.key.size = unit(1, 'cm'),
          legend.position = "bottom",
+         strip.background = element_blank(),
+         panel.grid.minor = element_blank(),
+         panel.grid.major.x = element_blank(),
          strip.text = element_text(size=20),
          legend.text=element_text(size=16),
          legend.title=element_text(size=16),
-         axis.text.x= element_text(size=20),
+         #axis.ticks.x=element_blank(),
+         axis.text.x= element_text(size=16, angle=66, hjust=1),
          axis.text.y= element_text(size=20),
          title=element_text(size=16))
 

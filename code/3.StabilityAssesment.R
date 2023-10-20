@@ -301,9 +301,14 @@ summary.stability.plot <-  df.stability.summary.small %>%
       x="interaction function") + 
   guides(fill= guide_legend(override.aes = list(pattern = c("none")))) +
   facet_wrap(as.factor(external_factor)~., nrow=3) +
+  scale_y_continuous( expand= c(0,0))+
+  theme_bw() +
   theme(panel.background = element_blank(),
         legend.key.size = unit(1, 'cm'),
+        strip.background = element_blank(),
         title =element_text(size=16),
+        panel.grid = element_blank(),
+        panel.border =  element_blank(),
         axis.text.x= element_text(size=16),
         axis.text.y= element_text(size=16),
         legend.text=element_text(size=16),
@@ -538,25 +543,36 @@ ggsave("figures/sensitivity_analysis_stability.pdf",
        width = 10, height = 8)
 
 #---- detailed visualisation -----
-df.stability.summary <- df.stability.summary %>%
+df.detailed.stability <- df.stability.summary %>%
+filter(external_factor =="No external factor") %>%
   gather(ratio.i,ratio.j, key="stability",value="value.stability" ) %>%
-    ggplot(aes(fill=as.factor(function.int))) + 
-           stat_count(aes(x=as.factor(value.stability))) +
+  filter(!is.na(value.stability)) %>%
+  mutate(value.stability =case_when(value.stability > 100 ~ 100,
+                                    T ~ value.stability)) %>%
+  ggplot(aes(x=comp.com, y=value.stability)) + 
+  stat_boxplot() +
+  facet_wrap(.~function.name, nrow=1) + 
   theme_bw() + 
-  scale_fill_colorblind()
+  theme(axis.text.x= element_text(size=16,angle=70, hjust=1)) 
   
-  df.stability.summary%>%
-    ggplot(aes(fill=as.factor(function.int))) + 
-    stat_count(aes(x=synchrony.significance), na.rm= T) +
-    theme_bw() + 
-    scale_fill_colorblind()
+df.detailed.synchrony <- df.stability.summary %>%
+  filter(external_factor =="No external factor") %>%
+  filter(!is.na(synchrony.short)) %>%
+  ggplot(aes(x=comp.com, y=synchrony.short)) + 
+  stat_boxplot() +
+  facet_wrap(.~function.name, nrow=1) + 
+  theme_bw() + 
+  theme(axis.text.x= element_text(size=16,angle=70, hjust=1)) 
 
-  df.stability.summary%>%
+df.detailed.oscillation <-  df.stability.summary %>%
+    filter(external_factor =="No external factor") %>%
     gather(eigB.j , eigB.i, key= "eigB", value="value.eigB") %>%
-    ggplot(aes(x=as.factor(function.int))) + 
-    geom_violin(aes(y=value.eigB,color=eigB), na.rm = T) +
+    filter(!is.na(value.eigB)) %>%
+    ggplot(aes(x=comp.com, y=value.eigB)) + 
+    stat_boxplot() +
+    facet_wrap(.~function.name, nrow=1) + 
     theme_bw() + 
-    scale_fill_colorblind()
+    theme(axis.text.x= element_text(size=16,angle=70, hjust=1)) 
 
 ggsave(last_plot(),
        file = "figures/summary.abundances.pdf")

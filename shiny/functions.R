@@ -221,8 +221,8 @@ server <- function(input, output) {
     }
     
     
-    Fi <- lambda* exp(aii*Ni + aij*Nj)
-    return(Fi)
+    Fi <- exp(lambda + aii*Ni + aij*Nj)
+    return(log(Fi))
   }
   
   output$ComDyn <- renderUI({
@@ -285,7 +285,7 @@ server <- function(input, output) {
       #geom_smooth(alpha=0.8,color="grey") + 
       labs(title="Fecundity distribution") + 
       geom_point() +
-      xlab("Neighbour density of species j") + ylab("Fecundity of species i")+
+      xlab("Neighbour density of species j") + ylab("Fecundity of species i (ln)")+
       theme_bw()
   }, res = 96)
   

@@ -17,7 +17,7 @@ library(ggthemes)
 library(tsvr) # library for the timescale specific variance ratio
 library(data.table) # write csv.gz
 library(ppcor) # partial correlation value
-
+library(scales) # for pretty breaks with scale_axis
 ###########################################################################################################
 # 1. # 1. Compute Low- Density Growth Rates for wide range of parameters without coexistence restriction
 ##########################################################################################################
@@ -91,6 +91,8 @@ for( n in 1:10000){
       }
 }
 
+save(params,
+     file = paste0("results/sim_params.Rdata"))
 
 df.sim  <- NULL
 
@@ -191,52 +193,125 @@ ggsave(example.abundance.external.fact,
 
 #---- Abundance through time no external factors , two simulations ----
 
+# Facilitation 
+comp <- df.sim$sim.i[which(df.sim$a_initial.i.j < -0.3 &
+                                df.sim$a_initial.i.j > df.sim$a_initial.i.i &
+                                df.sim$a_initial.j.i > df.sim$a_initial.j.j &
+               df.sim$a_initial.j.i < -0.3 &
+               df.sim$time == 1 &
+               df.sim$function.int == 1 &
+               df.sim$external_factor == "No external factor" &
+               df.sim$invader == "both")]
+fac <- df.sim$sim.i[which(df.sim$a_initial.i.j > 0.3 &
+                             df.sim$a_initial.j.i > 0.3 &
+                             df.sim$time == 1 &
+                             df.sim$function.int == 1 &
+                             df.sim$external_factor == "No external factor" &
+                             df.sim$invader == "both")]
+
+roundUpNice <- function(x, nice=c(1,2,4,5,6,8,10)) {
+  if(length(x) != 1) stop("'x' must be of length 1")
+  10^floor(log10(x)) * nice[[which(x <= 10^floor(log10(x)) * nice)[[1]]]]
+}
+
+fancy_scientific <- function(l){
+  l <- roundUpNice(l)
+  #l <- round(l)
+  # turn in to character string in scientific notation
+  l <- format(l)
+  # round to one point after the .
+  l <- gsub("^(.*)e", "'\\1'e", l)
+  # quote the part before the exponent to keep all the digits
+  l <- gsub("^(.*)e", "'\\1'e", l)
+  # turn the 'e+' into plotmath format
+  l <- gsub("e", "%*%10^", l)
+  # return this as an expression
+  return(l)
+}
+
+
 example.abundance.runawaysim.list <- list()
-for(n in c(4,17,67)){
-example.abundance.runawaysim.list[[as.character(n)]] <- df.sim[which((df.sim$sim.i == n) &
-                                                  df.sim$time < 51 &
-                                                  df.sim$external_factor == "No external factor" &
-                                                  df.sim$invader == "both"),] %>%
+
+ for(n in c(305,70)){
+   df.plot <- NULL
+    for( fct.int in 1:4){
+      df.plot.n <- Ricker_solution_withalpha(gens=31,
+                                             state=c(5,5),pars = params[[n]],
+                                             function.int=fct.int,
+                            add_external_factor="none") %>%
+        add_column("function.int"= fct.int) %>%
+        filter(time < 31)
+
+      df.plot.n$resulting.alpha.i <- df.plot.n$aii*df.plot.n$Ni + df.plot.n$aij*df.plot.n$Nj
+      df.plot.n$resulting.alpha.j <- df.plot.n$ajj*df.plot.n$Nj + df.plot.n$aji*df.plot.n$Ni
+      df.plot <- bind_rows(df.plot, df.plot.n)
+    }
+   df.plot <- df.plot %>% mutate(function.name = case_when(function.int==1 ~"1.Constant",
+                                    function.int==2 ~"2.Linear",
+                                    function.int==3 ~"3.Exp",
+                                    function.int==4 ~"4.Sigmoid"))
+   
+scale.resulting.alpha <- c(df.plot[,c("resulting.alpha.i")],df.plot[,c("resulting.alpha.j")])
+scale.resulting.alpha[which(scale.resulting.alpha < -1)] <- -1
+scale.resulting.alpha[which(scale.resulting.alpha > 1)] <- 1
+
+example.abundance.runawaysim.list[[as.character(n)]] <- df.plot %>%
   gather(Ni, Nj, key=species, value=abundance) %>%
+  add_column("abundance.label" = abundance.label,
+    "scale.resulting.alpha"= scale.resulting.alpha) %>%
   ggplot(aes(x=time)) +
-  geom_line(aes(y= abundance,color=species)) +
-  geom_line(aes(y= external.fact),color="black") +
+  geom_line(aes(y= abundance,color=species),size=1.5,alpha=8) +
+  geom_point(aes(y= abundance,fill=scale.resulting.alpha),
+             color="white", shape=21,size=2.5, alpha=0.8)+
   theme_bw() + 
-  facet_wrap(.~function.name,nrow=1,scales="free")+
-  scale_color_manual(values=c("#332288", "#999933")) +
-  scale_fill_manual(values=c("#332288", "#999933")) +
-  labs(y="",
-       x="") +
+  facet_wrap(.~function.name,nrow=1,scales="free") +
+  scale_color_manual(values=c("black", darken("grey"))) +
+  scale_fill_gradient2("Resulting biotic effect",limit=c(-1,1),
+                      low="#661100", high="#117733", mid="#DDCC77") +
+  scale_y_continuous(limits = function(y) c(0,max(y)),
+                     #breaks=c(0,NA),
+                     breaks = function(y) c(0,
+                                            #roundUpNice(median(y)*0.25),
+                                            roundUpNice(median(y)), 
+                                            #roundUpNice(median(y)*1.25),
+                                            roundUpNice(max(y))),
+                     #labels = function(y) c(0,roundUpNice(max(y))),
+                     #labels = function(y) c(0,
+                      #                      fancy_scientific(mean(y,na.omit=T)),
+                      #                      fancy_scientific(max(y,na.omit=T))),
+                     expand=   c(0.01 ,0.0001) ) +
+  labs(y="", x="") +
   theme( legend.key.size = unit(1, 'cm'),
          strip.text = element_text(size=20),
+         strip.background = element_blank(),
+         panel.grid.major.x = element_blank(),
+         panel.grid.minor = element_blank(),
          legend.text=element_text(size=20),
          legend.title=element_text(size=20),
          axis.text.x= element_text(size=16),
          axis.text.y= element_text(size=16),
          #axis.title.y= element_text(size=16),
          title=element_text(size=25))
-}
-example.abundance.runawaysim
+ }
 
 #######Graph A&B##################
 
 example.abundance.runawaysim <-  ggpubr::ggarrange(plotlist = example.abundance.runawaysim.list, 
-                                          ncol=1, nrow=3,
-                                          labels=c("Runaway dynamics", 
-                                                   "One-species community",
-                                                   "Two-species community"),
+                                          ncol=1, nrow=2,
+                                          labels=c("Constant Facilitation", 
+                                                   "Constant Competition"),
                             align = "v",
                             hjust=-0.3,
                             vjust = -0.5,    
                             font.label = list(size = 20, color = "black", 
                                               face = "bold", family = NULL, position = "top"),
-                            common.legend=T, legend="right") +
+                            common.legend=T, legend="top") +
   theme(plot.margin = margin(1.5,0.1,0.2,0.1, "cm")) 
 
 library(grid)
 example.abundance.runawaysim <- annotate_figure(example.abundance.runawaysim, 
-                                                top= textGrob("Abundance over time of a two-species communities, for one set of parameters,\nfitted in each interaction function respectively",  
-                                                              gp = gpar(fontsize=20, cex = 1.3)),
+                                                #top= textGrob("Abundance over time of a two-species communities, for one set of parameters,\nfitted in each interaction function respectively",  
+                                                 #             gp = gpar(fontsize=20, cex = 1.3)),
                                                 left = textGrob("Local abundance", 
                                                                 rot = 90, vjust = 3, 
                                                                 gp = gpar(fontsize=18,cex = 1.3)),
