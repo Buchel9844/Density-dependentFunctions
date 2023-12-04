@@ -16,8 +16,8 @@ library(broom)
 df.stability <- as.data.frame(df.sim.comcomp[which(df.sim.comcomp$invader =="both"),])
  
  summary.df.stability <- NULL
- nsims <- 500
- t.num = 100 # number of generation
+ nsims <- 750
+ t.num = 500 # number of generation
  stand.variable <- c(paste0("a_initial",c(".i.i",".j.j",".i.j",".j.i")),
                      paste0("a_slope",c(".i.i",".j.j",".i.j",".j.i")),
                      paste0("c",c(".i.i",".j.j",".i.j",".j.i")),
@@ -27,11 +27,11 @@ df.stability <- as.data.frame(df.sim.comcomp[which(df.sim.comcomp$invader =="bot
  df.stability.summary <- NULL
  for(i in 1:nsims){
    for( function.int in 1:4){
-     for(add_external_factor in c("No external factor","Noisy change","Periodic change")){
+     for(add_external_factor in c("No external factor")){
        print(paste0("int ", i,"for funct ",function.int, add_external_factor))
        
    df.stability.n <-  as.data.frame(df.stability[which(df.stability$sim.i == i & 
-                                           df.stability$time > 10 & 
+                                           df.stability$time > 100 & 
                                            df.stability$function.int == function.int &
                                            df.stability$external_fact == add_external_factor),] )
  
@@ -75,10 +75,10 @@ df.stability <- as.data.frame(df.sim.comcomp[which(df.sim.comcomp$invader =="bot
       }
       
       if(stability.int ==0){
-        stability.significance = "unstable"
+        stability.significance = "non-equilibrium"
       }
       if(stability.int ==1){
-        stability.significance = "half-stable"
+        stability.significance = "one species equilibrium"
       }
       if(stability.int ==2){
         stability.significance = "stable"
@@ -206,8 +206,8 @@ df.stability <- as.data.frame(df.sim.comcomp[which(df.sim.comcomp$invader =="bot
                                      external_factor = add_external_factor,
                                      mean.i=c(mean(df.stability.n$Ni)),
                                      mean.j=c(mean(df.stability.n$Nj)),
-                                     msd.i = c(msdi),
-                                     msd.j = c(msdj),
+                                     median.i=c(median(df.stability.n$Ni)),
+                                     median.j=c(median(df.stability.n$Nj)),
                                      ratio.i = c(ratio_i),
                                      ratio.j = c(ratio_j),
                                      oscillation.significance =   oscillation.significance, 
@@ -269,16 +269,27 @@ df.stability.summary.small <- df.stability.summary.small %>%
                                     significance == "synchrony, unstable, oscillation"|significance == "unstable, oscillation"|
                                     significance == "synchrony, unstable, half_oscillation"~ "unstable synchronous oscillation",
                                   TRUE ~ significance
-                                  )) 
+                                  ),
+         significance = factor(significance,
+                               levels=c("stable","stable oscillation","stable synchrony","stable synchronous oscillation",
+                                        "half-stable","half-stable oscillation","half-stable synchrony","half-stable synchronous oscillation",
+                                        "unstable","unstable synchronous oscillation"))) 
 
 levels(as.factor(df.stability.summary.small$significance))
 levels(as.factor(df.stability.summary.small$external_factor))
 
   df.stability.summary.small[which(is.na(df.stability.summary.small$significance)),]
-
+  my_cols <- c("#AA4499", "#DDCC77","#88CCEE", "#44AA99")
+  cols_interaction <- c("#661100", "#888888", "#6699CC", "#332288") # "#DDCC77","#661100","#117733")
+  
 safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
                              "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
-colorblind_palette_8 <- safe_colorblind_palette[!safe_colorblind_palette %in% my_cols]
+
+safe_colorblind_palette_4 <-c("lightgrey","#CC6677","#117733","#999933",
+                              "lightgrey","#CC6677","#117733","#999933",
+                              "lightgrey","#999933")
+
+#colorblind_palette_8 <- safe_colorblind_palette[!safe_colorblind_palette %in% my_cols]
 #scales::show_col(safe_colorblind_palette)
 
 df.stability.summary.small <- df.stability.summary.small  %>%
@@ -289,20 +300,30 @@ df.stability.summary.small <- df.stability.summary.small  %>%
   
   
 summary.stability.plot <-  df.stability.summary.small %>%
-  #filter(comp.com !="no species" & comp.com !="run away population") %>%
-  ggplot(aes(x=as.factor(function.name), fill=as.factor(significance))) + 
-  scale_fill_manual(values=  safe_colorblind_palette ) +
-  stat_count(position="stack")+
+  filter(comp.com !="no species" & comp.com !="run away population" &
+           external_factor =="No external factor") %>%
+  ggplot(aes(x=as.factor(function.name), fill=as.factor(significance),
+             pattern =as.factor(significance)), 
+         color="black") + 
+  geom_bar_pattern(position="stack",
+                   pattern_spacing = 0.01,
+                   pattern_frequency = 1,
+                   pattern_density = 0.05,
+                   pattern_key_scale_factor = 0.8,
+                   pattern_fill="NA",
+                   color="black") +
+  scale_pattern_manual("Community dynamics",values=c("none","none","none","none",
+                                                     'stripe','stripe','stripe','stripe',
+                                                     "crosshatch","crosshatch")) +
+  scale_fill_manual("Community dynamics",values=  safe_colorblind_palette_4 ) +
   labs(title ="Percentage of community predicted to have at least one species in \nthe community with underlying dynamics",
       #subtitle = " initial intraspecific interactions",
-      pattern= "Community composition",
-      fill = "Community dynamics",
       y="Number of communities driven by a specific dynamics",
       x="interaction function") + 
-  guides(fill= guide_legend(override.aes = list(pattern = c("none")))) +
-  facet_wrap(as.factor(external_factor)~., nrow=3) +
+  #guides(fill= guide_legend(override.aes = list(pattern = c("none")))) +
+  #facet_wrap(as.factor(external_factor)~., nrow=3) +
   scale_y_continuous( expand= c(0,0))+
-  theme_bw() +
+  theme_minimal() +
   theme(panel.background = element_blank(),
         legend.key.size = unit(1, 'cm'),
         strip.background = element_blank(),

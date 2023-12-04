@@ -121,13 +121,13 @@ my_cols <- c("#AA4499", "#DDCC77","#88CCEE", "#44AA99")
 predict_sensitivity_plot <- predict %>%
   ggplot(aes(x=value,color=function.name,fill=function.name)) +
   #geom_smooth(aes(y=predict.stability), se=FALSE)+
-  geom_point(aes(y=stability),alpha=0.1,size=0.5) +
-  geom_smooth(aes(y=predict.stability))+
-  theme_bw()+
+  geom_point(aes(y=log(stability+1)),alpha=0.1,size=0.5) +
+  geom_smooth(aes(y=log(predict.stability+1)))+
+  theme_bw() +
   scale_color_manual(values = darken(my_cols, amount = .1)) + 
   scale_fill_manual(values = my_cols) + 
   facet_wrap(~term,nrow = 2,dir="v",scales="free") +
-  scale_y_continuous(limits=c(0,100)) +
+  scale_y_continuous(limits=c(0,5)) +
   theme(legend.background = element_rect(color = "white"),
         legend.position ="right",
         legend.text = element_text(size = 10),
@@ -135,7 +135,7 @@ predict_sensitivity_plot <- predict %>%
         legend.key.size = unit(0.5, units = "in"))+
   #facet_wrap(~comp, nrow = 2) +
   labs(title="Prediction of parameters' effect for each function on the stability of one species in 2-species community",
-       y = "Stability ratio \nlow values equal lower stability",
+       y = "Stability ratio (log+1) \nlow values equal lower stability and < 1 is unstable",
        x = "Range of value specific to the parameters, from low to high",
        fill = "function", color = "function") 
 
@@ -186,13 +186,18 @@ int_sensitivity_plot <- sens_out %>%
         panel.grid.minor.y = element_blank(),
         legend.position = c(.87,.90),
         legend.background = element_rect(color = "black"),
-        legend.text = element_text(size = 10),
+        legend.text = element_text(size = 16),
         legend.title = element_blank(),
         legend.key.size = unit(0.1, units = "in"),
-        axis.text.y = element_text(size = 12, angle = 0, 
-                                   hjust = 1, margin = margin(t =10))) +
+        title = element_text(size = 18),
+        axis.text.y = element_text(size = 16, angle = 0, 
+                                   hjust = 1, margin = margin(t =10)),
+        
+        axis.text.x = element_text(size = 16, angle = 0, 
+                                   hjust = 1, margin = margin(t =10)),
+        axis.title.x = element_text(size = 18)) +
   #facet_wrap(~comp, nrow = 2) +
-  labs(title="Effect size of parameters for each function on the stability of one species in 2-species community",
+  labs(title="Effect size of parameters for each function on the stability of one species\nin 2-species community",
        y = "", x = "Effect Size on Stability of i \n ratio mean/var", fill = "", color = "") 
 
 int_sensitivity_plot

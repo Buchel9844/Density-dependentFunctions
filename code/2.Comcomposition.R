@@ -3,21 +3,26 @@ library(ggpattern)
 ##########################################################################################################
 # 1. minimum  abundance
 ##########################################################################################################
-
+df.sim <- as.data.frame(df.sim)
 df.min.abundance <- NULL
-nsims <- 500
+nsims <- 750
 for(i in 1:nsims){
   for( function.int in 1:4){
-    for(add_external_factor in c("No external factor","Noisy change","Periodic change")){
+    for(add_external_factor in c("No external factor")){
       print(paste0("int ", i,"for funct ",function.int, add_external_factor))
       df.min.abundance.n <- df.sim[which(df.sim$sim.i == i &
                         df.sim$function.int == function.int &
-                        df.sim$external_factor == add_external_factor),]
-      
+                        df.sim$external_factor == add_external_factor &
+                          df.sim$time > 99),]
+
       vec.abundance.Ni <- df.min.abundance.n$Ni
       vec.abundance.Nj <- df.min.abundance.n$Nj
       vec.GR.Ni <- df.min.abundance.n$dNi
       vec.GR.Nj <- df.min.abundance.n$dNj
+      
+      df.runaway.n <- df.sim[which(df.sim$sim.i == i &
+                                           df.sim$function.int == function.int &
+                                           df.sim$external_factor == add_external_factor),]
        
   
       df.min.abun.n <- data.frame(sim = i,
@@ -31,7 +36,10 @@ for(i in 1:nsims){
                                 min.GR = c(vec.GR.Ni[which(vec.abundance.Ni ==min(vec.abundance.Ni, na.rm=T))[1]],
                                            vec.GR.Nj[which(vec.abundance.Nj ==min(vec.abundance.Nj, na.rm=T))[1]]),
                                 max.abundance = c(max(vec.abundance.Ni, na.rm=T),max(vec.abundance.Nj, na.rm=T)),
-                                max.GR = c(max(vec.GR.Ni, na.rm=T),max(vec.GR.Nj, na.rm=T)))
+                                max.GR = c(max(vec.GR.Ni, na.rm=T),max(vec.GR.Nj, na.rm=T)),
+                                max.abundance.all = c(max(df.runaway.n$Ni, na.rm=T),max(df.runaway.n$Nj, na.rm=T)),
+                                max.GR.all = c(max(df.runaway.n$dNi, na.rm=T),max(df.runaway.n$dNj, na.rm=T)),
+                                median.abundance.all = c(median(df.runaway.n$Ni, na.rm=T),median(df.runaway.n$Nj, na.rm=T)))
       
       df.min.abundance <- bind_rows(df.min.abundance,df.min.abun.n)
     }
@@ -43,18 +51,18 @@ df.min.abundance  <- df.min.abundance  %>%
                                    function.int==2 ~"2.Linear",
                                    function.int==3 ~"3.Exp",
                                    function.int==4 ~"4.Sigmoid")) %>%
-  mutate(Mean.class = case_when(mean.abundance < 0.05 ~"Null",
+  mutate(Mean.class = case_when(mean.abundance <=0 ~"Null",
                                 mean.abundance > 500 ~"Runaway",
                               T ~"Okay"),
-         Median.class = case_when(median.abundance < 0.05 ~"Null",
-                                median.abundance > 500 ~"Runaway",
+         Median.class = case_when(median.abundance <=0 ~"Null",
+                                  median.abundance.all > 1000 ~"Runaway",
                                 T ~"Okay"),
-         GR.class = case_when(min.GR >= 1  & max.GR < 100 ~"Positive",
-                              max.GR > 100 ~"unbound" ,
-                              min.GR==0 & max.GR < 100 ~"Null constant",
+         GR.class = case_when(min.GR >= 1  & max.GR < 500 ~"Positive",
+                              max.GR.all > 500 ~"unbound" ,
+                              min.GR==0 & max.GR < 500 ~"Null constant",
                                    T ~"Negative or NA"),
-         Abundance.class = case_when( min.abundance > 0 & max.abundance < 500 ~ "Persisting",
-                                      max.abundance > 500 ~"unbound",
+         Abundance.class = case_when( min.abundance > 0 & max.abundance < 1000 ~ "Persisting",
+                                      max.abundance.all  > 1000 ~"unbound",
                                      T ~"Extinct or NA"))
          
 #save dataset
@@ -81,20 +89,26 @@ df.min.abun.horyzontal <- full_join(df.min.abundance[which(df.min.abundance$foca
                                       
                                T ~"one-species community")) %>%
   mutate(Interspecific.interaction = case_when(a_initial.inter.Ni > 0 &
-                                                 a_initial.inter.Nj  >0 ~ "facilitation",
+                                                 a_initial.inter.Nj  > 0 ~ "facilitation",
                                                a_initial.inter.Ni < 0 &
                                                  a_initial.inter.Nj  < 0 ~ "competition",
                                                T~"both")) %>%
-  mutate(comp.com = factor(comp.com, levels=c("run away population","no species","one-species community","two-species community")))
+  mutate(comp.com = factor(comp.com, levels=c("run away population","no species","one-species community","two-species community")),
+         Interspecific.interaction = factor(Interspecific.interaction,
+                                            levels=c("competition","both","facilitation")))
 
 
 # visualisation
 #my_cols <- c("#AA4499", "#DDCC77","#88CCEE", "#44AA99")
-cols_interaction <- c( "#DDCC77","#661100","#117733")
+cols_interaction <- c("#661100", "#888888", "#6699CC", "#332288") # "#DDCC77","#661100","#117733")
+safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
+                             "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
+
+
+
 com.comp.plot <- ggplot(df.min.abun.horyzontal[df.min.abun.horyzontal$external_factor =="No external factor",],
-                            aes( x=as.factor(comp.com),
-                                 fill=as.factor(Interspecific.interaction),
-                                 color=as.factor(Interspecific.interaction) )) +
+                            aes( fill=as.factor(comp.com),
+                                 x=as.factor(Interspecific.interaction) )) +
 
   geom_bar()+
   #labels=c("run away population","no species","1-species","2-species")) +
@@ -103,11 +117,11 @@ com.comp.plot <- ggplot(df.min.abun.horyzontal[df.min.abun.horyzontal$external_f
   scale_fill_manual(
   values = cols_interaction) + 
   facet_wrap(.~function.name,nrow=1) +
-  scale_y_continuous(limits=c(0,500), expand = c(0, 0)) +
-  scale_x_discrete(labels = c("run away","no species","one-species","two-species")) +
-  theme_bw() +
-  labs(y="Number of simulated communities", x="",
-       fill=expression(paste("Initial interaction value ", alpha['0,i,j'])))+
+  scale_y_continuous(limits=c(0,250), expand = c(0, 0)) +
+ # scale_x_discrete(labels = c("run away","no species","one-species","two-species")) +
+  theme_minimal() +
+  labs(y="Number of simulated communities", fill="Community trajectory",
+       x="Governing interaction")+
        #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
   guides(color="none") +
   theme( legend.key.size = unit(1, 'cm'),
@@ -115,12 +129,14 @@ com.comp.plot <- ggplot(df.min.abun.horyzontal[df.min.abun.horyzontal$external_f
          strip.background = element_blank(),
          panel.grid.minor = element_blank(),
          panel.grid.major.x = element_blank(),
-         strip.text = element_text(size=20),
-         legend.text=element_text(size=16),
-         legend.title=element_text(size=16),
+         strip.text = element_text(size=28),
+         legend.text=element_text(size=20),
+         legend.title=element_text(size=20),
          #axis.ticks.x=element_blank(),
-         axis.text.x= element_text(size=16, angle=66, hjust=1),
+         axis.text.x= element_text(size=20, angle=66, hjust=1),
          axis.text.y= element_text(size=20),
+         axis.title.x= element_text(size=24),
+         axis.title.y= element_text(size=24),
          title=element_text(size=16))
 
 com.comp.plot
@@ -129,9 +145,8 @@ ggsave(com.comp.plot,
 
 # ALL
 com.comp.plot.all <- ggplot(df.min.abun.horyzontal,
-                            aes( x=as.factor(comp.com),
-                                 fill=as.factor(Interspecific.interaction),
-                                 color=as.factor(Interspecific.interaction) )) +
+                            aes( fill=as.factor(comp.com),
+                                 x=as.factor(Interspecific.interaction) )) +
   
   geom_bar()+
   #labels=c("run away population","no species","1-species","2-species")) +
@@ -139,16 +154,16 @@ com.comp.plot.all <- ggplot(df.min.abun.horyzontal,
   #scale_pattern_fill_manual(values = my_cols) + 
   scale_fill_manual(
     values = cols_interaction) + 
-  #scale_pattern_fill_manual(values = my_cols) + 
-  facet_wrap(external_factor~function.name,nrow=3) +
-  scale_y_continuous(limits=c(0,500), expand = c(0, 0)) +
-  theme_bw() +
-  labs(y="Number of simulated communities", x="",
-       fill=expression(paste("Initial interaction value ", alpha['0,i,j'])))+
+  facet_wrap(external_factor~function.name) +
+  scale_y_continuous(limits=c(0,250), expand = c(0, 0)) +
+  # scale_x_discrete(labels = c("run away","no species","one-species","two-species")) +
+  theme_minimal() +
+  labs(y="Number of simulated communities", fill="Community trajectory",
+       x=expression(paste("Initial interaction value", alpha['0,i,j'])))+
   #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
   guides(color="none") +
   theme( legend.key.size = unit(1, 'cm'),
-         legend.position = "bottom",
+         legend.position = "right",
          strip.background = element_blank(),
          panel.grid.minor = element_blank(),
          panel.grid.major.x = element_blank(),
@@ -161,8 +176,8 @@ com.comp.plot.all <- ggplot(df.min.abun.horyzontal,
          title=element_text(size=16))
 
 com.comp.plot.all
-ggsave(com.comp.plot,
-       file = "figures/com.comp.plot.pdf")
+ggsave(com.comp.plot.all,
+       file = "figures/com.comp.plot.all.pdf")
 
 
 # join dataset with full simulation

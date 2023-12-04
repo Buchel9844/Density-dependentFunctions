@@ -18,19 +18,21 @@ library(tsvr) # library for the timescale specific variance ratio
 library(data.table) # write csv.gz
 library(ppcor) # partial correlation value
 library(scales) # for pretty breaks with scale_axis
+library(grid)
+
 ###########################################################################################################
 # 1. # 1. Compute Low- Density Growth Rates for wide range of parameters without coexistence restriction
 ##########################################################################################################
 source("code/PopProjection_toolbox.R")
 
 # define parameters
-nsims <- 500
+nsims <- 750
 species <- 2
 function.int <- c(1:4)
 t.num = 100
 gen = seq(from=0, to=t.num , by=1)
 # run sim
-set.seed(1608)
+
 
 # Set parameters lists
 alpha.coexistence <- function(species){
@@ -51,10 +53,16 @@ white.noise <- function(t.num){
   return( e_noise)
 }
 
+set.seed(1644)
+
 params <-list()
-i=1
-for( n in 1:10000){
+i <- 1
+init.facilitation_tally <- 0
+init.comp_tally <- 0
+init.faccomp_tally <- 0
+for( n in c(1:2000)){
   if(i==nsims+1) next
+  print(paste(n,i,init.facilitation_tally,init.comp_tally,init.faccomp_tally))
     params[[i]] <- list(
                 # stable parameters
                     sim= i, 
@@ -72,7 +80,7 @@ for( n in 1:10000){
                                                   c("i", "j"))),
                     
                     a_initial = matrix(ncol=species, nrow = species, # a_slope, only negative values
-                                       data = rtruncnorm(n=species*species, mean=-0.2, sd=0.5, a=-1, b=1),
+                                       data = rtruncnorm(n=species*species, mean= -0.1, sd=0.5, a=-1, b=1),
                                        dimnames = list(c("i", "j"),
                                                        c("i", "j"))),
               
@@ -85,22 +93,64 @@ for( n in 1:10000){
                     e_noise = white.noise(t.num)
                   
                     )
-    if(params[[i]]$a_initial[1,1] > 0 | params[[i]]$a_initial[2,2] > 0){
-      i = i}else{
+    
+    params[[i]]$a_initial[1,1] <- -abs(params[[i]]$a_initial[1,1])
+    params[[i]]$a_initial[2,2] <- -abs(params[[i]]$a_initial[2,2])
+    
+    
+    if(params[[i]]$a_initial[1,2] > 0 & params[[i]]$a_initial[2,1] > 0){
+      if(init.facilitation_tally >= 250) {
+        i = i 
+        next
+      }else{i = i + 1
+      init.facilitation_tally <- init.facilitation_tally + 1
+      next
+      } 
+    }
+    if((params[[i]]$a_initial[1,2] > 0 & params[[i]]$a_initial[2,1] < 0 )|
+       (params[[i]]$a_initial[1,2] < 0 & params[[i]]$a_initial[2,1] > 0)){
+      if(init.faccomp_tally >= 250){
+        i = i
+        next
+      }else{
         i = i + 1
+        init.faccomp_tally <- init.faccomp_tally + 1
+        next
       }
+    }
+        
+    if(params[[i]]$a_initial[1,2] < 0 & params[[i]]$a_initial[2,1] < 0){
+      if(init.comp_tally >= 250){
+        i = i
+        next
+      }else{
+        i = i + 1
+        init.comp_tally <- init.comp_tally + 1
+        next
+         }
+       }
+      
 }
+
+#check all tally equal 250
+length(params)
+init.facilitation_tally ==250
+init.comp_tally==250
+init.faccomp_tally ==250
+
+
 
 save(params,
      file = paste0("results/sim_params.Rdata"))
+load("results/sim_params.Rdata")
 
 df.sim  <- NULL
 
-t.num = 100 # number of generation
+t.num = 500 # number of generation
 set.seed(1608)
 for(i in 1:nsims){
   for( function.int in 1:4){
-    for(add_external_factor in c("none","season","noise")){
+    for(add_external_factor in c("none")){ #c("none","season","noise")
     print(paste0("int ", i,"for funct ",function.int, add_external_factor))
     df.n <- NULL
     p <- params[[i]]
@@ -112,17 +162,17 @@ for(i in 1:nsims){
       spread(key=vars, value=value) %>%
       mutate(function.int  = function.int ) # attention!!! identity of the focal is the last suffixes
     
-    df.inv <- NULL
-    df.inv <- GrowthSimInv(par.dat = p, t.num  = t.num,
-         function.int,
-         add_external_factor) %>%# simulation of invasion for both species
-      bind_cols(df.n) 
+    #df.inv <- NULL
+    #df.inv <- GrowthSimInv(par.dat = p, t.num  = t.num,
+    #     function.int,
+    #    add_external_factor) %>%# simulation of invasion for both species
+    #  bind_cols(df.n) 
    
     df.initc <- Ricker_solution(state = c(5,5), pars= p, gens=t.num,
                         function.int,add_external_factor) %>% # simulation of initial condition = 1,1
       mutate(invader = "both") %>%
       bind_cols(df.n) %>% 
-      bind_rows(df.inv)%>% 
+     # bind_rows(df.inv)%>% 
       mutate(external_factor= add_external_factor)
     
     df.sim <- bind_rows(df.sim, df.initc)
@@ -161,25 +211,31 @@ df.sim$Nj <- as.numeric(df.sim$Nj)
 ##########################################################################################################
 sim = 100
 t.num= 100
+
 #---- Abundance through time with external factors----
   
-example.abundance.external.fact <- df.sim[which(df.sim$sim.i == 2 &
-                                                df.sim$time < 51 &
+example.abundance.external.fact <- df.sim[which(df.sim$sim.i == 0 &
+                                                #df.sim$time < 51 &
                                                 df.sim$invader == "both"),] %>%
   gather(Ni, Nj, key=species, value=abundance) %>%
+  mutate(abundance = case_when(abundance > 5000 ~ 5000, 
+                               T ~ abundance)) %>%
   ggplot(aes(x=time)) +
-  geom_line(aes(y= abundance,color=species)) +
-  geom_line(aes(y= external.fact),color="black") +
+  geom_line(aes(y= log(abundance+1),color=species)) +
+  #geom_line(aes(y= external.fact),color="black") +
   theme_bw() + 
   scale_color_manual(values=c("#332288", "#999933")) +
   scale_fill_manual(values=c("#332288", "#999933")) +
-  facet_wrap(external_factor ~ function.name ,nrow=3,
-             scales="free")+
+  facet_wrap(external_factor ~ function.name ,nrow=3)+
   labs(title = "Abundance over time of a two-species communities, for one set of parameters,\nfitted in each interaction function respectively",
-       y="Local abundance",
+       y="Local abundance (log)",
        x="Time")+
-  theme( legend.key.size = unit(1, 'cm'),
+  scale_y_continuous(expand=c(0.01,0.01)) +
+  theme( legend.key.size = unit(2, 'cm'),
          strip.text = element_text(size=20),
+         strip.background = element_blank(),
+         panel.grid.major.x = element_blank(),
+         panel.grid.minor = element_blank(),
          legend.text=element_text(size=20),
          legend.title=element_text(size=20),
          axis.text.x= element_text(size=16),
@@ -187,7 +243,7 @@ example.abundance.external.fact <- df.sim[which(df.sim$sim.i == 2 &
          #axis.title.y= element_text(size=16),
          title=element_text(size=25))
 example.abundance.external.fact
-ggsave(example.abundance.external.fact,
+ ggsave(example.abundance.external.fact,
        file = "figures/example.abundance.external.fact.pdf")
 
 
@@ -228,102 +284,200 @@ fancy_scientific <- function(l){
   # return this as an expression
   return(l)
 }
-
-
+comp
+fac
 example.abundance.runawaysim.list <- list()
+my_cols <- c("#AA4499", "#DDCC77","#88CCEE", "#44AA99")
 
- for(n in c(305,70)){
+#24
+ for(n in c(584,156)){
    df.plot <- NULL
+   df.alpha <-NULL
     for( fct.int in 1:4){
-      df.plot.n <- Ricker_solution_withalpha(gens=31,
+      df.plot.n <- Ricker_solution_withalpha(gens=21,
                                              state=c(5,5),pars = params[[n]],
                                              function.int=fct.int,
                             add_external_factor="none") %>%
         add_column("function.int"= fct.int) %>%
-        filter(time < 31)
+        filter(time < 21)
 
-      df.plot.n$resulting.alpha.i <- df.plot.n$aii*df.plot.n$Ni + df.plot.n$aij*df.plot.n$Nj
-      df.plot.n$resulting.alpha.j <- df.plot.n$ajj*df.plot.n$Nj + df.plot.n$aji*df.plot.n$Ni
+      df.plot.n$resulting.alpha.i <-  df.plot.n$aij*df.plot.n$Nj + df.plot.n$aii*df.plot.n$Ni 
+      df.plot.n$resulting.alpha.j <-  df.plot.n$aji*df.plot.n$Ni + df.plot.n$ajj*df.plot.n$Nj 
       df.plot <- bind_rows(df.plot, df.plot.n)
-    }
+      
+      
+      df.alpha_n <- as.data.frame(params[[n]][c("sim","Nmax","a_slope","a_initial","c")]) %>%
+        mutate(focal = c("i","j")) %>%
+        mutate(function.int = fct.int ) %>%
+        filter(focal =="i") %>%
+        remove_rownames() %>%
+        bind_cols(data.frame(density=c(0:20)))%>%
+        as.data.frame()
+      
+        if(df.alpha_n$function.int[1]==1){
+          df.alpha_n$alpha_inter_value <- df.alpha_n$a_initial.j[1]
+          
+        }
+        if(df.alpha_n$function.int[1]==2){
+          df.alpha_n$alpha_inter_value <- alpha_function2(df.alpha_n$a_initial.j[1],
+                                                          df.alpha_n$a_slope.j[1],
+                                                          df.alpha_n$density,
+                                                          df.alpha_n$Nmax.j[1])
+          
+        }
+        if(df.alpha_n$function.int[1]==3){
+          df.alpha_n$alpha_inter_value <- alpha_function3(df.alpha_n$a_initial.j[1],
+                                                          df.alpha_n$a_slope.j[1],
+                                                          df.alpha_n$c.j[1],
+                                                          df.alpha_n$density,
+                                                          df.alpha_n$Nmax.j[1])
+          
+        }
+        if(df.alpha_n$function.int[1]==4){
+          df.alpha_n$alpha_inter_value <- alpha_function4(df.alpha_n$a_initial.j[1],
+                                                          df.alpha_n$a_slope.j[1],
+                                                          df.alpha_n$c.j[1],
+                                                          df.alpha_n$density,
+                                                          df.alpha_n$Nmax.j[1])
+        }
+        
+        df.alpha <- bind_rows(df.alpha,df.alpha_n )
+        
+      }
+
    df.plot <- df.plot %>% mutate(function.name = case_when(function.int==1 ~"1.Constant",
                                     function.int==2 ~"2.Linear",
                                     function.int==3 ~"3.Exp",
                                     function.int==4 ~"4.Sigmoid"))
    
-scale.resulting.alpha <- c(df.plot[,c("resulting.alpha.i")],df.plot[,c("resulting.alpha.j")])
+   df.alpha <-  df.alpha %>% mutate(function.name = case_when(function.int==1 ~"1.Constant",
+                                                           function.int==2 ~"2.Linear",
+                                                           function.int==3 ~"3.Exp",
+                                                           function.int==4 ~"4.Sigmoid"))
+   
+#scale.resulting.alpha <- c(df.plot[,c("resulting.alpha.i")],df.plot[,c("resulting.alpha.j")])
+scale.resulting.alpha <- c(df.plot[,c("resulting.alpha.i")])
+
 scale.resulting.alpha[which(scale.resulting.alpha < -1)] <- -1
 scale.resulting.alpha[which(scale.resulting.alpha > 1)] <- 1
 
-example.abundance.runawaysim.list[[as.character(n)]] <- df.plot %>%
+plot.abundance <- df.plot %>%
   gather(Ni, Nj, key=species, value=abundance) %>%
-  add_column("abundance.label" = abundance.label,
-    "scale.resulting.alpha"= scale.resulting.alpha) %>%
+  filter(species=="Ni") %>%
+  #mutate(abundance = case_when(is.na(abundance) ~ 0 ,
+  #                             abundance > 10000 ~ 10000,
+   #                            T ~ abundance)) %>%
+  add_column(#"abundance.label" = abundance,
+    scale.resulting.alpha= scale.resulting.alpha) %>%
   ggplot(aes(x=time)) +
-  geom_line(aes(y= abundance,color=species),size=1.5,alpha=8) +
-  geom_point(aes(y= abundance,fill=scale.resulting.alpha),
-             color="white", shape=21,size=2.5, alpha=0.8)+
+  geom_line(aes(y= log(abundance+1),color=function.name),size=3,alpha=0.8) +
   theme_bw() + 
-  facet_wrap(.~function.name,nrow=1,scales="free") +
-  scale_color_manual(values=c("black", darken("grey"))) +
-  scale_fill_gradient2("Resulting biotic effect",limit=c(-1,1),
-                      low="#661100", high="#117733", mid="#DDCC77") +
-  scale_y_continuous(limits = function(y) c(0,max(y)),
-                     #breaks=c(0,NA),
-                     breaks = function(y) c(0,
-                                            #roundUpNice(median(y)*0.25),
-                                            roundUpNice(median(y)), 
-                                            #roundUpNice(median(y)*1.25),
-                                            roundUpNice(max(y))),
-                     #labels = function(y) c(0,roundUpNice(max(y))),
-                     #labels = function(y) c(0,
-                      #                      fancy_scientific(mean(y,na.omit=T)),
-                      #                      fancy_scientific(max(y,na.omit=T))),
-                     expand=   c(0.01 ,0.0001) ) +
-  labs(y="", x="") +
-  theme( legend.key.size = unit(1, 'cm'),
+  labs(x="Time in years",y="Local abundance of\nfocal species(log10)", #y="",#
+       color= "") +
+  scale_color_manual(values=my_cols) +
+  coord_cartesian(ylim=c(0,8)) +
+  #guides(color="none") +
+  theme( legend.key.size = unit(2, 'cm'),
          strip.text = element_text(size=20),
          strip.background = element_blank(),
          panel.grid.major.x = element_blank(),
          panel.grid.minor = element_blank(),
          legend.text=element_text(size=20),
          legend.title=element_text(size=20),
-         axis.text.x= element_text(size=16),
-         axis.text.y= element_text(size=16),
+         axis.text.x= element_text(size=14),
+         axis.text.y= element_text(size=14),
          #axis.title.y= element_text(size=16),
          title=element_text(size=25))
+
+plot.alpha <- df.alpha %>%
+  ggplot(aes(x=density)) +
+  geom_point(aes(y= alpha_inter_value,color=function.name),size=3,alpha=0.8) +
+  geom_line(aes(y= alpha_inter_value,color=function.name),size=3,alpha=0.8) +
+  theme_bw() + 
+  geom_hline(yintercept = 0) + 
+  scale_y_continuous( expand=c(0,0)) +
+  coord_cartesian(ylim=c(-1.5,1.5)) +
+  geom_label(x=16,y=1.35,label="Facilitation",size=8) +
+  geom_label(x=16,y=-1.35,label="Competition",size=8) +
+  scale_color_manual(values=my_cols) +
+  labs(color="", y="Interspecific\nPer capita effect" ,#y="",#
+       x="Neigbours heterospecific density") +
+  theme( legend.key.size = unit(2, 'cm'),
+         strip.text = element_text(size=20),
+         strip.background = element_blank(),
+         panel.grid.major.x = element_blank(),
+         panel.grid.minor = element_blank(),
+         legend.text=element_text(size=20),
+         legend.title=element_text(size=20),
+         axis.text.x= element_text(size=14),
+         axis.text.y= element_text(size=14),
+         #axis.title.y= element_text(size=16),
+         title=element_text(size=25))
+
+if(length(example.abundance.runawaysim.list) ==0){
+  example.abundance.runawaysim.list[[paste0("plot",n)]]  <- ggarrange(plot.alpha,plot.abundance,
+                                                                      ncol=2,nrow=1,
+                                                                      common.legend = F,
+                                                                      legend="none")
+}
+if(length(example.abundance.runawaysim.list) ==1){
+  example.abundance.runawaysim.list[[paste0("plot",2)]]  <- ggplot() + theme_void()
+  
+}
+if(length(example.abundance.runawaysim.list) == 2){
+  example.abundance.runawaysim.list[[paste0("plot",n)]]  <- ggarrange(plot.alpha,plot.abundance,
+                                                     ncol=2,nrow=1,
+                                                     common.legend = T,
+                                                     legend="bottom")
+
+ }
  }
 
+
+length(example.abundance.runawaysim.list)
 #######Graph A&B##################
 
-example.abundance.runawaysim <-  ggpubr::ggarrange(plotlist = example.abundance.runawaysim.list, 
-                                          ncol=1, nrow=2,
-                                          labels=c("Constant Facilitation", 
-                                                   "Constant Competition"),
-                            align = "v",
-                            hjust=-0.3,
-                            vjust = -0.5,    
-                            font.label = list(size = 20, color = "black", 
-                                              face = "bold", family = NULL, position = "top"),
-                            common.legend=T, legend="top") +
-  theme(plot.margin = margin(1.5,0.1,0.2,0.1, "cm")) 
 
+ example.abundance.runawaysim <-  ggpubr::ggarrange(plotlist = example.abundance.runawaysim.list, 
+                                           nrow=3, ncol=1,
+                                           heights = c(1,0.1,1),
+                                          labels=c("a. Initial interspecific interaction is facilitative", 
+                                                   "",
+                                                   "b. Initial interspecific interaction is competitive"),
+                            align = "v",
+                            hjust= -0.18,
+                            vjust = -0.5,    
+                            font.label = list(size = 22, color = "black", 
+                                              face = "bold", family = NULL, position = "top"),
+                           common.legend = F, legend="none") +
+  theme(plot.margin = margin(3,1,1,1, "cm"))  
+ example.abundance.runawaysim
 library(grid)
-example.abundance.runawaysim <- annotate_figure(example.abundance.runawaysim, 
-                                                #top= textGrob("Abundance over time of a two-species communities, for one set of parameters,\nfitted in each interaction function respectively",  
-                                                 #             gp = gpar(fontsize=20, cex = 1.3)),
-                                                left = textGrob("Local abundance", 
+ 
+example.abundance.runawaysim <- annotate_figure(example.abundance.runawaysim, left = textGrob("Local abundance (log10)", 
                                                                 rot = 90, vjust = 3, 
                                                                 gp = gpar(fontsize=18,cex = 1.3)),
-                                  bottom = textGrob("Time", hjust = 0,vjust=-1.5, 
-                                                    gp = gpar(fontsize=18,cex = 1.3)))
+                                                right = textGrob("Facilitation", 
+                                                                # check.overlap = T,
+                                                                 rot=90,
+                                                                vjust = -8, hjust = 0.25,
+                                                                gp = gpar(fontsize=18,cex = 1.3)),
+                                  bottom = textGrob("Time in years",vjust=-2, 
+                                                    gp = gpar(fontsize=18,cex = 1.3)))+
+  theme(plot.margin=grid::unit(c(0,-10,-10,-10), "mm"))
+example.abundance.runawaysim
+example.abundance.runawaysim <-  annotate_figure(example.abundance.runawaysim,
+                  right = textGrob("Competition", 
+                                   check.overlap = T,
+                                   vjust = -7.8, hjust = 1.5,
+                                   rot=90,
+                                   gp = gpar(fontsize=18,cex = 1.3))) +
+    theme(plot.margin=grid::unit(c(0,-10,0,0), "mm"))
+
 example.abundance.runawaysim
 
 ggsave(example.abundance.runawaysim,
        file = "figures/example.abundance.runawaysim.pdf")
-
-
-
 
 #---- Abundance through time for all scenario----
 df.min.abundance[which(df.min.abundance$sim.i ==sim &

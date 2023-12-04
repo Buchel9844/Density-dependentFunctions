@@ -50,7 +50,7 @@ library(wesanderson) # for color palette
 library(ggthemes) 
 #---- 1.2. Import the competitive data ----
 
-competition <- read.csv("/Users/lisabuche/Documents/Projects/Perenjori/data/Perenjori_competition_2022.csv",
+competition <- read.csv("/Users/lisabuche/Documents/Projects/Perenjori/data/Sevenello2022_competition.csv",
                         header = T,stringsAsFactors = F, sep=",",
                         na.strings=c("","NA"))
 
