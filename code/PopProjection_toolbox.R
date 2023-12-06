@@ -256,57 +256,39 @@ Ricker_solution_NatData <- function(gens,
                                     pars) {
   function.int <- pars$function.int[1]
   Nmax <- pars$Nmax # density at which fecundity is max - effect of neighbors is 0
-  g <- pars$g # germination rate 
-  s <- pars$s #seed survival
-  lambda <- pars$lambda # intrinsic growth rate
+  g <- pars$g[1] # germination rate 
+  s <- pars$s[1] #seed survival
+  lambda <- pars$lambda[1] # intrinsic growth rate
   a_initial <- pars$alpha_init # which int.function
   a_slope <- pars$alpha_slope # which int.function
   c <- pars$alpha_c # which int.function
-  neigh <- levels(as.factor(pars$neigh)) # number of neighbours
-  n.neigh <- length(neigh) 
-  focal <- levels(as.factor(pars$focal)) # number of focal
-  n.focal <- length(focal)
-  position <- c(!neigh %in% focal)
+   
+  df <- state
   
-  
-  position.df <- 1:n.focal*n.neigh # position of parameter for each focal in the data.frame
-  
-  df <- data.frame(matrix(data= rep(NA,each=(1+gens)*n.neigh),
-                          ncol=n.neigh, nrow=1+gens))
-  names(df) <- c(paste0("N",1:n.neigh))
-  df[1,] <- state #species i initial densities
-  df[,position] <- state
-  
-  for(t in 1:gens){
+  for(t in 1:(gens-1)){
     Nt1 <- c()
     Fec <- c()
-    Nt <- df[t,!position]  # species i densities
-    for( n in 1:n.focal){
-      low = position.df[n]-(n.neigh - 1)
-      up = position.df[n]
-      if(function.int==1){
-        a <- a_initial[low:up]
+    Nt <-  df[t,]  # species i densities
+    if(function.int==1){
+        a <- a_initial
       }
       if(function.int==2){
-        a <- alpha_function2(a_initial[low:up], a_slope[low:up],g*Nt, Nmax[low:up])
+        a <- alpha_function2(a_initial, a_slope,g*Nt, Nmax)
       }
       if(function.int==3){
-        a <- alpha_function3(a_initial[low:up], a_slope[low:up],c[low:up],g*Nt, Nmax[low:up])
+        a <- alpha_function3(a_initial, a_slope,c,g*Nt, Nmax)
       }
       if(function.int==4){
-        a <- alpha_function4(a_initial[low:up], a_slope[low:up],c[low:up],g*Nt, Nmax[low:up])
+        a <- alpha_function4(a_initial, a_slope,c,g*Nt, Nmax)
       }
       
-      Fec[n] <- exp(lambda[position.df[n]] + sum(a*g*Nt))
+      Fec <- exp(lambda + sum(a*g*Nt))
       
-      Nt1[n] <- ((1-g) * s + g* Fec[n])*Nt[n]
-      
+      Nt1 <- ((1-g) * s + g* Fec)*Nt$conspecific
+      df$conspecific[t+1] <- c(Nt1)
     }
-    df[t+1,!position] <- c(Nt1)
     
-  }
-  names(df) <- c(neigh)
-  df$time <- c(0:gens) 
+  df$time <- c(1:gens) 
   return(df)
 }
 # function modified from https://github.com/laurenmh/avena-erodium/blob/master/invader_resident_comparison.R

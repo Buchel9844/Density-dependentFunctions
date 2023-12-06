@@ -53,9 +53,8 @@ library(ggthemes)
 competition <- read.csv("/Users/lisabuche/Documents/Projects/Perenjori/data/Sevenello2022_competition.csv",
                         header = T,stringsAsFactors = F, sep=",",
                         na.strings=c("","NA"))
-
 species.neigh <- names(competition)
-species.neigh  <- species.neigh[!species.neigh %in% c("Site","Focal","Crop", "Transect", "Plot","Treatment")]
+species.neigh  <- species.neigh[!species.neigh %in% c("reserve","focal","crop", "site", "plot","treatment","year")]
 
 competition.to.keep <- competition %>%  
   dplyr::select(all_of(c(species.neigh)))%>%
@@ -65,7 +64,7 @@ length(competition.to.keep[competition.to.keep == 0]) # check if any is 0
 
 
 competition <- competition %>% 
-  dplyr::filter(Treatment =="OP") 
+  dplyr::filter(treatment =="OP") 
 
 # change the format of the rows to numeric 
 competition[species.neigh] <- sapply(competition[species.neigh],as.numeric)
@@ -73,7 +72,7 @@ competition[species.neigh] <- sapply(competition[species.neigh],as.numeric)
 # change na values to 0
 competition[is.na(competition)] <- 0
 
-focal.levels <- levels(as.factor(competition$Focal))
+focal.levels <- levels(as.factor(competition$focal))
 
 #---- 1.2. Make Teasorus ----
 perenjory_tesaorus <- read.csv("/Users/lisabuche/Documents/Projects/Perenjori/data/perenjory_tesaorus.csv",
@@ -85,43 +84,42 @@ competition.long.neigh <- competition %>%
   left_join(perenjory_tesaorus) 
 
 competition.long.focal <- competition.long.neigh %>%
-  filter(Focal ==code) %>%
+  filter(focal ==code) %>%
   rename("conspecific"="abundance") %>%
   dplyr::select(-code) 
 
 competition.long <- competition.long.neigh %>%
-  aggregate(abundance ~  family + Site + Focal+ Crop + Transect + Plot + Treatment, sum )%>%
+  aggregate(abundance ~  family + reserve + year + site + focal+ crop + site + plot + treatment, sum )%>%
   spread(family, abundance)  %>%# change this ti have grass /forb or native/exotic
   right_join(competition.long.focal)
 
 competition.long <- competition.long.neigh %>%
-  aggregate(abundance ~  functional.group + Site + Focal+ Crop + Transect + Plot + Treatment, sum )%>%
+  aggregate(abundance ~  functional.group + reserve + year + site + focal+ crop + site + plot + treatment, sum )%>%
   spread(functional.group, abundance)  %>%# change this ti have grass /forb or native/exotic
   right_join(competition.long.focal)
 
 #---- 1.4. Import the seeds data ----
-fecundity.df <- read.csv("/Users/lisabuche/Documents/Projects/Perenjori/data/Perenjori_seed_2022.csv",
+fecundity.df <- read.csv("/Users/lisabuche/Documents/Projects/Perenjori/data/Sevenello2022_seeds.csv",
                          header = T,stringsAsFactors = F, sep=",",
                          na.strings=c("","NA"))
 head(fecundity.df)
 fecundity.df <- fecundity.df %>% 
-  dplyr::filter(Treatment =="OP") %>% 
-  rename("Focal"="Species")
+  dplyr::filter(treatment =="OP")
 
-fecundity.df$Site <- as.factor(fecundity.df$Site)
+fecundity.df$reserve <- as.factor(fecundity.df$reserve)
 
-seeds.model <- glm(round(Seeds) ~ Site + Focal  ,fecundity.df, 
+seeds.model <- glm(round(seeds) ~ reserve + focal  ,fecundity.df, 
                      family="poisson")
 
 summary(seeds.model) # random Side effect not signidicant - not considered further
   
-seeds.graph <- ggplot(fecundity.df,aes(x=Seeds,color=Focal)) + 
+seeds.graph <- ggplot(fecundity.df,aes(x=seeds,color=focal)) + 
     geom_density() +
   xlim(0,200)
     
 # join both compeetiton and seed 
 competition.seeds <- left_join(competition.long,fecundity.df,
-                               by=c("Site", "Focal", "Crop", "Transect", "Plot", "Treatment"))
+                               by=c("site", "focal", "crop", "reserve", "plot", "treatment"))
 
 
 
@@ -486,7 +484,7 @@ for (n in 1:nrow(df_alpha_all)){
 write.csv(df_funct_alpha,
           paste0("results/df_funct_alpha_LARO_",grouping,".csv.gz"))
 
-df_funct_alpha <- data.table::fread("results/df_funct_alpha.csv.gz")
+df_funct_alpha <- data.table::fread("results/df_funct_alpha_LARO_family.csv.gz")
 
 cbp2 <- c("#000000", "#E69F00", "#56B4E9","#F0E442","#009E73",
           "#CC79A7", "#0072B2", "#D55E00")
@@ -564,7 +562,7 @@ LARO.alpha <- ggplot(df_funct_alpha[which(df_funct_alpha$focal == "LARO"
   theme_bw() +
   labs(#title = element_text(focal.levels[n],
         #                    color=cb2_focal[n]),
-       y= "Effect of neighbours on focal",
+       y= "Per capita effect of neighbours on focal",
        x="density of neighbours") +
   rremove("ylab") + rremove("xlab") + 
   geom_hline(yintercept=0, color="black", linetype="dashed") +
@@ -584,7 +582,7 @@ LARO.alpha <- ggplot(df_funct_alpha[which(df_funct_alpha$focal == "LARO"
         plot.margin = unit(c(1,0.2,1,0.2), 'lines')) 
 
 LARO.alpha <- annotate_figure(LARO.alpha , 
-                                  left = textGrob("Effect of neighbours on focal", rot = 90, vjust = 1, 
+                                  left = textGrob("Per capita effect of neighbours on focal", rot = 90, vjust = 1, 
                                                   gp = gpar(fontsize=20,cex = 1.3)),
                                   bottom = textGrob("Density of neighbours",  
                                                     gp = gpar(fontsize=20,cex = 1.3)))
@@ -595,7 +593,7 @@ ggsave(LARO.alpha,
 #---- 4.2. Population Projections ----
 
 df_param_all <- data.frame(focal=NA)
-for(Code.focal in focal.levels){
+for(Code.focal in "LARO"){
   for (function.int in c(1:4)){
     #if (Code.focal == "TROR") next
     df_param <- data.frame()
@@ -603,11 +601,11 @@ for(Code.focal in focal.levels){
     function.vec[function.int] <- 1
     alpha.function <- paste0("function_",which(function.vec==1))
     
-    load(paste0("results/stan/Parameters_",Code.focal,"_",alpha.function,".RData"))
+    load(paste0("results/stan/Parameters_family_",Code.focal,"_",alpha.function,".RData"))
     parameters <- get(paste0("Parameters_",Code.focal,"_",alpha.function))
     N <- parameters[["DataVec"]]$N
     Nmax <- parameters[["DataVec"]]$Nmax
-    neighbours.vec <- c("forb","grass",Code.focal)
+    neighbours.vec <- c(parameters[["SpNames"]])
     df_param_init <- data.frame(observation = c(1:N),
                                 focal = Code.focal,
                                 function.int = function.int)
@@ -656,31 +654,82 @@ df_param_all <- df_param_all[-1,] # nrow = 120 == 4(fct) * 5(species) * 6(neighb
 str(df_param_all)
 df_projection <- NULL
 
-grass.abundances
-  
-levels(as.factor(df_param_all$lambda))
-for(Code.focal in focal.levels){
-for (function.int in c(1:4)){
+community_id_df <- data.table::fread("/Users/lisabuche/Documents/Projects/Perenjori/results/community_id_df_short.csv")
+
+
+community_id_df_LARO <- community_id_df %>% 
+  dplyr::filter(genus =="lawrencella" & year == "2022") %>%
+  aggregate(count ~ id.plot + collector+  family + scale.weight, sum) %>%
+  mutate(count=count/16)
+head(community_id_df_LARO)
+ggplot(community_id_df_LARO, aes(x=count)) +geom_density()
+
+community_id_df_fam <- community_id_df %>% 
+  dplyr::filter(family %in% levels(as.factor(df_param_all$neigh))) %>%
+  aggregate(count ~ id.plot + collector+ year + family + scale.weight, sum) %>%
+  mutate(count=count/16) %>%
+  spread(family,count)
+
+
+
+gens = 20
+for(Code.focal in "LARO"){
+ for (function.int in c(1:4)){
+  for(i in 1:100){
   param.df <- df_param_all[which(df_param_all$function.int==function.int & 
                                    df_param_all$focal==Code.focal ),]
   param.df$g = 0.7
   param.df$s = 0.9
-  state = c(20)
+  state_df <- data.frame("araliaceae"= round(sample(community_id_df_fam$araliaceae[!is.na(community_id_df_fam$araliaceae)], gens)),
+                         "asteraceae"=round(sample(community_id_df_fam$asteraceae[!is.na(community_id_df_fam$asteraceae)], gens)),
+                         "crassulaceae"=round(sample(community_id_df_fam$crassulaceae[!is.na(community_id_df_fam$crassulaceae)], gens)),
+                         "goodeniaceae"=round(sample(community_id_df_fam$goodeniaceae[!is.na(community_id_df_fam$goodeniaceae)], gens)),
+                         "montiaceae"=round(sample(community_id_df_fam$montiaceae[!is.na(community_id_df_fam$montiaceae)], gens)),
+                         "poaceae"=round(sample(community_id_df_fam$poaceae[!is.na(community_id_df_fam$poaceae)],gens)),
+                         "conspecific" = round(sample(community_id_df_LARO$count,1,replace = T)),
+                         "rare"=round(rnorm(gens, mean = 1, sd = 0.2)))
   
-  df_projection_n <- Ricker_solution_NatData(gens = 20,
-                                             state,pars = param.df)
+  df_projection_n <- Ricker_solution_NatData(gens=gens,
+                                             state=state_df,
+                                             pars = param.df)
+
+  df_projection_n$sim <- i 
   df_projection_n$function.int <- function.int
   df_projection_n$focal <- Code.focal
   df_projection <-  bind_rows(df_projection, df_projection_n)
-}
-}
+  }
+  }
+ }
+
 plot_projection <- df_projection %>%
-  gather(all_of(c("forb","grass",focal.levels)), key="species", value="abundance") %>%
-  ggplot(aes(y=abundance, x= time, color=species)) +
-  geom_path() + # scale_y_log10() +
+  gather(all_of(levels(as.factor(df_param_all$neigh))), key="species", value="abundance") %>%
+  ggplot(aes(y=abundance, x= time, fill=species,color=species)) +
+  geom_smooth() +  
   facet_wrap(focal ~ function.int,
              scales="free") +
   theme_bw()
+plot_projection 
+
+community_id_df_fam <- ggplot() +
+  stat_summary(data=community_id_df_fam ,
+               aes(x=as.character(year), y = count,
+                   group=as.factor(family),color=as.factor(family)),
+               fun.y = median,
+               fun.ymin = function(x) median(x) - sd(x), 
+               fun.ymax = function(x) median(x) + sd(x), 
+               geom = "pointrange",size=2) +
+  stat_summary(data=community_id_df_fam ,
+               aes(x=as.character(year), y = count,
+                   group=as.factor(family),color=as.factor(family)),
+               fun.y = median,
+               geom = "line",size=1)+
+  scale_x_discrete("year",limits=c("2010","2011","2012-2014","2015","2016",
+                                   "2017","2018","2019","2020","2021","2022")) +
+  labs(color="family",y="Median number of individuals in 1meter squarred plot",
+       title="Density over time of annual plants in Perenjory region") +
+  coord_cartesian( xlim = NULL, ylim = c(0,200),expand = TRUE, default = FALSE, clip = "on") 
+  
+  community_id_df_fam 
 
 ggsave(plot_projection, 
        file = "figures/NatData_plot_projection.pdf")
