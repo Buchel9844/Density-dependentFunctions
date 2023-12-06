@@ -34,7 +34,8 @@ df.stability <- as.data.frame(df.sim.comcomp[which(df.sim.comcomp$invader =="bot
                                            df.stability$time > 100 & 
                                            df.stability$function.int == function.int &
                                            df.stability$external_fact == add_external_factor),] )
- 
+   comp.com.n <- df.stability.n$comp.com[1]
+   if(!comp.com.n  %in% c("one-species community","two-species community")) next
 #Mean  over time   
    mean.i=c(mean(df.stability.n$Ni))
    mean.j=c(mean(df.stability.n$Nj))
@@ -78,9 +79,9 @@ df.stability <- as.data.frame(df.sim.comcomp[which(df.sim.comcomp$invader =="bot
         stability.significance = "non-equilibrium"
       }
       if(stability.int ==1){
-        stability.significance = "one species equilibrium"
+        stability.significance = "one-species equilibrium"
       }
-      if(stability.int ==2){
+      if(stability.int ==2|(stability.int ==1 & comp.com.n=="one-species community")){
         stability.significance = "stable"
       }
       
@@ -156,7 +157,9 @@ df.stability <- as.data.frame(df.sim.comcomp[which(df.sim.comcomp$invader =="bot
               coeff.j$eigB.j > 0 )
             ){
           oscillation.significance = "half_oscillation"
-          
+          if(comp.com.n=="one-species community"){
+            oscillation.significance = "oscillation" 
+          }
           
         }else{
                 if((coeff.i$eigB.i== 0 | coeff.j$eigB.j == 0 |is.na(coeff.i$eigB.i)| is.na(coeff.j$eigB.j)) &
@@ -187,9 +190,15 @@ df.stability <- as.data.frame(df.sim.comcomp[which(df.sim.comcomp$invader =="bot
      if(exists("vr.trial")){
      aggresShort <- aggts(vr.trial, vr.trial$ts[vr.trial$ts<4])[[3]]
      aggresLong <- aggts(vr.trial, vr.trial$ts[vr.trial$ts>=4])[[3]]
-     if(aggresShort>1 & aggresLong> 1){
-       synchrony.significance <- 1
-     }else{synchrony.significance <- 0}
+     if(aggresShort>1|aggresLong> 1){
+       synchrony.significance <- "Long and short synchrony"
+       if(aggresShort>1 & aggresLong < 1){
+         synchrony.significance <-"Short synchrony"
+       }
+       if(aggresShort<1 & aggresLong > 1){
+         synchrony.significance <-"Long synchrony"
+       }
+     }else{synchrony.significance <- "No"}
      }else{
        aggresLong <- NA
        aggresShort <- NA
@@ -212,9 +221,6 @@ df.stability <- as.data.frame(df.sim.comcomp[which(df.sim.comcomp$invader =="bot
                                      ratio.j = c(ratio_j),
                                      oscillation.significance =   oscillation.significance, 
                                      stability.significance = stability.significance,
-                                     #correlation.estimate=correlation.estimate,
-                                     #correlation.pvalue=correlation.pvalue,
-                                     #correlation.significance= correlation.significance,
                                      synchrony.significance = synchrony.significance,
                                      synchrony.long = aggresLong,
                                      synchrony.short = aggresShort) 
@@ -236,58 +242,49 @@ save(file="results/df.stability.summary.csv.gz",
  
 load("results/df.stability.summary.csv.gz") 
 #---- global visualisation -----
-df.stability.summary.small <- df.stability.summary %>%
-  mutate(#correlation.significance = case_when(correlation.significance == 1~"corr",
-          #                                    TRUE ~ "no"),
-         synchrony.significance = case_when(synchrony.significance == 1~"synchrony",
-                                            TRUE ~ "no"))
 
-df.stability.summary.small[df.stability.summary.small =="no"] <- NA
+df.stability.summary.small <- df.stability.summary
 
 df.stability.summary.small$significance <- apply(df.stability.summary.small[, c("synchrony.significance",
-                                              "stability.significance","oscillation.significance")],
+                                              "oscillation.significance")],
                          1, function(x) toString(na.omit(x)))
+
 df.stability.summary.small <- df.stability.summary.small %>%
-  mutate(significance = case_when(significance == "synchrony, oscillatory, oscillation" |
-                                    significance == "synchrony, oscillatory"|
-                                     significance == "synchrony, oscillatory, half_oscillation" ~ "synchronous oscillation",
-                                  
-                                   significance == "synchrony, half-stable, half_oscillation"|
-                                    significance == "synchrony, half-stable, oscillation" ~ "half-stable synchronous oscillation",
-                                 
-                                   significance =="stable, half_oscillation"|
-                                   significance =="stable, oscillation" ~ "stable oscillation",
-                                   significance =="oscillatory"|
-                                    significance =="oscillatory, half_oscillation" ~ "oscillation",
-                                  significance == "half-stable, half_oscillation"|
-                                   significance == "half-stable, oscillation" ~ "half-stable oscillation",
-                                  significance == "synchrony, half-stable" ~ "half-stable synchrony",
-                                  significance == "synchrony, stable" ~ "stable synchrony",
-                                  significance == "synchrony, stable, half_oscillation"|
-                                    significance == "synchrony, stable, oscillation"~ "stable synchronous oscillation",
-                                  significance == "synchrony, unstable"|significance == "unstable, half_oscillation"|
-                                    significance == "synchrony, unstable, oscillation"|significance == "unstable, oscillation"|
-                                    significance == "synchrony, unstable, half_oscillation"~ "unstable synchronous oscillation",
-                                  TRUE ~ significance
+  mutate(significance = case_when(   oscillation.significance == "half_oscillation" &
+                                       synchrony.significance == "no" ~ "one species oscillation",
+                                     oscillation.significance == "oscillation" &
+                                       synchrony.significance == "no" ~ "oscillation",
+                                     synchrony.significance == "Long and short synchrony"&
+                                       oscillation.significance == "no"  ~ "Long and short synchrony",
+                                     synchrony.significance == "Short synchrony"&
+                                       oscillation.significance == "no"  ~ "Short synchrony",
+                                     synchrony.significance == "Long synchrony" &
+                                       oscillation.significance == "no" ~ "Long synchrony",
+                                     ((synchrony.significance =="Long synchrony"|
+                                        synchrony.significance =="Short synchrony"|
+                                        synchrony.significance =="Long and short synchrony") & 
+                                       (oscillation.significance == "oscillation" |
+                                          oscillation.significance == "half_oscillation"))  ~ "Synchronous Oscillation",
+                                     TRUE ~ "no detected dynamics"
                                   ),
-         significance = factor(significance,
-                               levels=c("stable","stable oscillation","stable synchrony","stable synchronous oscillation",
-                                        "half-stable","half-stable oscillation","half-stable synchrony","half-stable synchronous oscillation",
-                                        "unstable","unstable synchronous oscillation"))) 
+         stability.significance = case_when(stability.significance == "stable" ~"All species",
+                                            stability.significance == "one-species equilibrium" ~"1 species out of 2",
+                                            stability.significance == "non-equilibrium" ~"0 species")) %>%
+  mutate(significance = factor(significance, 
+                               levels=c("no detected dynamics","Short synchrony","Long synchrony","Long and short synchrony","Synchronous Oscillation")))
 
 levels(as.factor(df.stability.summary.small$significance))
+levels(as.factor(df.stability.summary.small$stability.significance))
 levels(as.factor(df.stability.summary.small$external_factor))
+df.stability.summary.small[which(is.na(df.stability.summary.small$significance)),]
 
-  df.stability.summary.small[which(is.na(df.stability.summary.small$significance)),]
-  my_cols <- c("#AA4499", "#DDCC77","#88CCEE", "#44AA99")
-  cols_interaction <- c("#661100", "#888888", "#6699CC", "#332288") # "#DDCC77","#661100","#117733")
+my_cols <- c("#AA4499", "#DDCC77","#88CCEE", "#44AA99")
+cols_interaction <- c("#661100", "#888888", "#6699CC", "#332288") # "#DDCC77","#661100","#117733")
   
 safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
                              "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
 
-safe_colorblind_palette_4 <-c("lightgrey","#CC6677","#117733","#999933",
-                              "lightgrey","#CC6677","#117733","#999933",
-                              "lightgrey","#999933")
+safe_colorblind_palette_4 <-c("lightgrey","#6699CC","#332288","#117733","#DDCC77")
 
 #colorblind_palette_8 <- safe_colorblind_palette[!safe_colorblind_palette %in% my_cols]
 #scales::show_col(safe_colorblind_palette)
@@ -302,39 +299,60 @@ df.stability.summary.small <- df.stability.summary.small  %>%
 summary.stability.plot <-  df.stability.summary.small %>%
   filter(comp.com !="no species" & comp.com !="run away population" &
            external_factor =="No external factor") %>%
-  ggplot(aes(x=as.factor(function.name), fill=as.factor(significance),
-             pattern =as.factor(significance)), 
-         color="black") + 
-  geom_bar_pattern(position="stack",
-                   pattern_spacing = 0.01,
+  ggplot(aes(x=as.factor(stability.significance), 
+             pattern =as.factor(stability.significance),
+             fill=as.factor(significance))) + 
+  geom_bar_pattern(position="stack",color="black",
+                   pattern_spacing = 0.1,
                    pattern_frequency = 1,
                    pattern_density = 0.05,
                    pattern_key_scale_factor = 0.8,
-                   pattern_fill="NA",
-                   color="black") +
-  scale_pattern_manual("Community dynamics",values=c("none","none","none","none",
-                                                     'stripe','stripe','stripe','stripe',
-                                                     "crosshatch","crosshatch")) +
-  scale_fill_manual("Community dynamics",values=  safe_colorblind_palette_4 ) +
-  labs(title ="Percentage of community predicted to have at least one species in \nthe community with underlying dynamics",
+                   pattern_fill="NA") +
+  scale_pattern_manual("Temporal stability \nreached by",
+                       values=c("crosshatch",'stripe',"none")) +
+  scale_fill_manual("Community dynamics",
+                    values=  safe_colorblind_palette_4 ) +
+  facet_wrap(.~function.name, 
+             nrow=1, strip.position="bottom") + 
+  scale_y_continuous( expand= c(0,0)) +
+ labs(#title ="Percentage of community predicted to have at least one species in 
+     # the community with underlying dynamics",
       #subtitle = " initial intraspecific interactions",
-      y="Number of communities driven by a specific dynamics",
-      x="interaction function") + 
-  #guides(fill= guide_legend(override.aes = list(pattern = c("none")))) +
+      y="Number of community",
+      x="interaction functional form") + 
+  guides(fill= guide_legend(override.aes = list(pattern = "none"),
+                                                direction="vertical",
+                                                byrow = TRUE,
+                                                nrow = 5,
+                                                title.hjust = 0.1),
+         pattern= guide_legend(override.aes = list(fill = "white",
+                                                   pattern_spacing = 0.01),
+                                                   nrow = 3,
+                               direction="vertical",
+                                                   byrow = TRUE,
+                                                   title.hjust = 0.1)) +
   #facet_wrap(as.factor(external_factor)~., nrow=3) +
-  scale_y_continuous( expand= c(0,0))+
   theme_minimal() +
   theme(panel.background = element_blank(),
-        legend.key.size = unit(1, 'cm'),
+        legend.position = "right",
+        legend.text = element_text(size = 20, 
+                                   hjust = 0, 
+                                   vjust = 0.5),
+        legend.title = element_text(size = rel(1.3)),
+        legend.key.width = unit(9, "mm"),
+        legend.key.height = unit(9, "mm"),
+        title = element_text(size = rel(2)),
+        #legend.spacing.y = unit(10, "mm"),
         strip.background = element_blank(),
-        title =element_text(size=16),
+        #title =element_text(size=16),
         panel.grid = element_blank(),
         panel.border =  element_blank(),
-        axis.text.x= element_text(size=16),
-        axis.text.y= element_text(size=16),
-        legend.text=element_text(size=16),
-        legend.title=element_text(size=16),
-        strip.text = element_text(size=16)) 
+        axis.title = element_text(size = 24),
+        axis.text.x= element_blank(),
+        axis.text.y= element_text(size=20),
+        #legend.text=element_text(size=16),
+        #legend.title=element_text(size=16),
+        strip.text = element_text(size = 24)) 
   #theme_bw()
 
 summary.stability.plot 

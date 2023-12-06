@@ -150,7 +150,7 @@ t.num = 500 # number of generation
 set.seed(1608)
 for(i in 1:nsims){
   for( function.int in 1:4){
-    for(add_external_factor in c("none")){ #c("none","season","noise")
+    for(add_external_factor in c("none","season","noise")){ 
     print(paste0("int ", i,"for funct ",function.int, add_external_factor))
     df.n <- NULL
     p <- params[[i]]
@@ -214,7 +214,7 @@ t.num= 100
 
 #---- Abundance through time with external factors----
   
-example.abundance.external.fact <- df.sim[which(df.sim$sim.i == 0 &
+example.abundance.external.fact <- df.sim[which(df.sim$sim.i == 1 &
                                                 #df.sim$time < 51 &
                                                 df.sim$invader == "both"),] %>%
   gather(Ni, Nj, key=species, value=abundance) %>%
