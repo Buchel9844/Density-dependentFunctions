@@ -48,6 +48,7 @@ library(car)
 library(loo)
 library(wesanderson) # for color palette
 library(ggthemes) 
+library(grid)
 #---- 1.2. Import the competitive data ----
 
 competition <- read.csv("/Users/lisabuche/Documents/Projects/Perenjori/data/Sevenello2022_competition.csv",
@@ -137,7 +138,7 @@ for(Code.focal in "LARO"){ #focal.levels
   function.vec[function.int] <- 1
   
  # data for the focal
-  SpDataFocal <- competition.seeds[which(competition.seeds$Focal==Code.focal),] 
+  SpDataFocal <- competition.seeds[which(competition.seeds$focal==Code.focal),] 
   names(SpDataFocal) <- tolower(names(SpDataFocal))
   SpDataFocal <-  SpDataFocal[!is.na(SpDataFocal$seeds),]
   SpDataFocal[is.na(SpDataFocal)] <- 0
@@ -157,7 +158,7 @@ for(Code.focal in "LARO"){ #focal.levels
   # Now calculate the total number of plant species to use for the model, discounting
   #       any species columns with 0 abundance. Save a vector of the species names
   #       corresponding to each column for easy matching later.
-  AllSpNames <- names(SpDataFocal)[!names(SpDataFocal) %in% c("focal","year","day","month","transect","plot",
+  AllSpNames <- names(SpDataFocal)[!names(SpDataFocal) %in% c("focal","year","day","month","transect","plot","reserve",
                                                               "block","unique.plot","site","treatment",
                                                               "crop","flower","seeds","individual", "species","origine","functional.group",      
                                                               "family","flowercolor","final.code","flowers",                
@@ -358,7 +359,7 @@ for(Code.focal in "LARO"){ #focal.levels
 
 #---- 4.0. check models ----
 ModelCheck <- NULL
-for(Code.focal in focal.levels){#focal.levels
+for(Code.focal in "LARO"){#focal.levels
     for (function.int in c(1:4)){ # c(1:4)
       print(paste(Code.focal,", function",function.int))
       
@@ -376,6 +377,8 @@ for(Code.focal in focal.levels){#focal.levels
   }
 View(ModelCheck)
 
+write.csv(ModelCheck,
+          paste0("results/ModelCheck_LARO_",grouping,".csv.gz"))
 
 #---- 4.1 Alpha distribution ----
 
@@ -535,7 +538,7 @@ plot.alpha_all <- ggarrange(plotlist = plot.list.alpha,
                             font.label = list(size = 10, color = "black", 
                                               face = "bold", family = NULL, position = "top"),
                             nrow=4, common.legend=T, legend="right")
-library(grid)
+
 plot.alpha_all <- annotate_figure(plot.alpha_all, left = textGrob("Effect of neighbours on focal", rot = 90, vjust = 1, gp = gpar(cex = 1.3)),
                 bottom = textGrob("density of neighbours", gp = gpar(cex = 1.3)))
 ggsave(plot.alpha_all,
@@ -549,45 +552,61 @@ df_funct_alpha <- df_funct_alpha %>%
                                    function.int==4 ~"4.Sigmoid"))
 
 
-LARO.alpha <- ggplot(df_funct_alpha[which(df_funct_alpha$focal == "LARO"
-                                            ),],
-                               aes(x=density, y= alpha_value,
-                                      color=neigh,fill=neigh)) +
-  stat_smooth(method = 'gam',se = TRUE,level =0.95,size=2) +
-  facet_wrap(. ~ function.name, strip.position = "top",
-             nrow=2, ncol=2, scales = "free") +
-  scale_color_manual("neighbours identity",values=cbp2) + 
-  scale_fill_manual("neighbours identity",
-                    values=cbp2) + 
-  theme_bw() +
-  labs(#title = element_text(focal.levels[n],
-        #                    color=cb2_focal[n]),
-       y= "Per capita effect of neighbours on focal",
-       x="density of neighbours") +
-  rremove("ylab") + rremove("xlab") + 
-  geom_hline(yintercept=0, color="black", linetype="dashed") +
-  theme(plot.title = element_text(color="#000000",
-                                  vjust = -5),
-        strip.background = element_blank(), 
-        strip.placement = "outside",
-        strip.text =element_text(color="black"),
-        legend.key= element_rect(fill = "white"),
-        legend.text=element_text(size=20),
-        legend.title=element_text(size=20),
-        strip.text.x =element_text(size=16),
-        axis.text.x = element_text(size=16),
-        axis.text.y = element_text(size=16),
-        strip.text.y =element_text(size=16),
-        legend.key.size = unit(1, 'cm'),
-        plot.margin = unit(c(1,0.2,1,0.2), 'lines')) 
+dummy <- data.frame(uplimit=c(0.060,0.5,1.6,1),
+                    downlimit=c(-0.060,-1,-0.5,-0.5),
+                    function.name = c("1.Constant","2.Linear","3.Exp","4.Sigmoid"),
+                    stringsAsFactors=FALSE)
 
-LARO.alpha <- annotate_figure(LARO.alpha , 
+plot_LAROalpha_list <- list()
+
+for( i in c("1.Constant","2.Linear","3.Exp","4.Sigmoid")){
+  df <- df_funct_alpha %>%
+    dplyr::filter(focal == "LARO" & function.name==i)
+  plot_LAROalpha_list[[i]] <- ggplot(df,
+                                       aes(x=density, y= alpha_value,
+      color=neigh,fill=neigh)) +
+    stat_smooth(method = 'gam',se = TRUE,level =0.95,size=2) +
+    scale_color_manual("Neighbours identity",values=cbp2) + 
+    scale_fill_manual("Neighbours identity",
+                      values=cbp2) + 
+    theme_bw() +
+    labs(title = i ,
+      y= "Per capita effect of neighbours on focal",
+      x="density of neighbours") +
+    rremove("ylab") + rremove("xlab") + 
+    coord_cartesian( xlim = NULL, 
+                     ylim = c(dummy$downlimit[which(dummy$function.name==i)],
+                     dummy$uplimit[which(dummy$function.name==i)]),
+                     expand = TRUE, default = FALSE, clip = "on") +
+    scale_x_continuous( expand= c(0,0)) +
+    geom_hline(yintercept=0, color="black", linetype="dashed") +
+    guides(color= "none",fill="none") +
+    theme(plot.title = element_text(color="#000000",
+                                    vjust = 0,
+                                    size=24),
+          strip.background = element_blank(), 
+          strip.placement = "outside",
+          strip.text =element_text(color="black",size=20),
+          legend.key= element_rect(fill = "white"),
+          legend.text=element_text(size=20),
+          legend.title=element_text(size=20),
+          axis.text.x = element_text(size=16),
+          axis.text.y = element_text(size=16),
+          legend.key.size = unit(1, 'cm'),
+          plot.margin = unit(c(0,0,0,0), 'lines')) 
+  
+}
+plot_LAROalpha <- ggarrange( plotlist = plot_LAROalpha_list,
+                              ncol=1,align = c("hv"),
+                              common.legend = F)
+
+plot_LAROalpha <- annotate_figure(plot_LAROalpha , 
                                   left = textGrob("Per capita effect of neighbours on focal", rot = 90, vjust = 1, 
                                                   gp = gpar(fontsize=20,cex = 1.3)),
                                   bottom = textGrob("Density of neighbours",  
                                                     gp = gpar(fontsize=20,cex = 1.3)))
-LARO.alpha 
-ggsave(LARO.alpha,
+plot_LAROalpha
+ggsave(plot_LAROalpha,
        file = "figures/NatData_plot_LARO.pdf")
 
 #---- 4.2. Population Projections ----
@@ -659,7 +678,7 @@ community_id_df <- data.table::fread("/Users/lisabuche/Documents/Projects/Perenj
 
 community_id_df_LARO <- community_id_df %>% 
   dplyr::filter(genus =="lawrencella" & year == "2022") %>%
-  aggregate(count ~ id.plot + collector+  family + scale.weight, sum) %>%
+  aggregate(count ~ id.plot + collector +  family + scale.weight, sum) %>%
   mutate(count=count/16)
 head(community_id_df_LARO)
 ggplot(community_id_df_LARO, aes(x=count)) +geom_density()
@@ -671,15 +690,10 @@ community_id_df_fam <- community_id_df %>%
   spread(family,count)
 
 
-
+df_projection <- NULL
 gens = 20
 for(Code.focal in "LARO"){
- for (function.int in c(1:4)){
   for(i in 1:100){
-  param.df <- df_param_all[which(df_param_all$function.int==function.int & 
-                                   df_param_all$focal==Code.focal ),]
-  param.df$g = 0.7
-  param.df$s = 0.9
   state_df <- data.frame("araliaceae"= round(sample(community_id_df_fam$araliaceae[!is.na(community_id_df_fam$araliaceae)], gens)),
                          "asteraceae"=round(sample(community_id_df_fam$asteraceae[!is.na(community_id_df_fam$asteraceae)], gens)),
                          "crassulaceae"=round(sample(community_id_df_fam$crassulaceae[!is.na(community_id_df_fam$crassulaceae)], gens)),
@@ -688,7 +702,11 @@ for(Code.focal in "LARO"){
                          "poaceae"=round(sample(community_id_df_fam$poaceae[!is.na(community_id_df_fam$poaceae)],gens)),
                          "conspecific" = round(sample(community_id_df_LARO$count,1,replace = T)),
                          "rare"=round(rnorm(gens, mean = 1, sd = 0.2)))
-  
+  for (function.int in c(1:4)){
+    param.df <- df_param_all[which(df_param_all$function.int==function.int & 
+                                     df_param_all$focal==Code.focal ),]
+    param.df$g = 0.7
+    param.df$s = 0.9
   df_projection_n <- Ricker_solution_NatData(gens=gens,
                                              state=state_df,
                                              pars = param.df)
@@ -696,48 +714,125 @@ for(Code.focal in "LARO"){
   df_projection_n$sim <- i 
   df_projection_n$function.int <- function.int
   df_projection_n$focal <- Code.focal
-  df_projection <-  bind_rows(df_projection, df_projection_n)
+  df_projection_n$year <- c(2023:2042)
+  df_projection <- bind_rows(df_projection, df_projection_n)
   }
   }
  }
 
-plot_projection <- df_projection %>%
-  gather(all_of(levels(as.factor(df_param_all$neigh))), key="species", value="abundance") %>%
-  ggplot(aes(y=abundance, x= time, fill=species,color=species)) +
-  geom_smooth() +  
-  facet_wrap(focal ~ function.int,
-             scales="free") +
-  theme_bw()
+df_projection <- df_projection %>%
+  mutate(function.name = case_when(function.int==1 ~"1.Constant",
+                                   function.int==2 ~"2.Linear",
+                                   function.int==3 ~"3.Exp",
+                                   function.int==4 ~"4.Sigmoid")) %>%
+  gather(all_of(levels(as.factor(df_param_all$neigh))), key="species", value="abundance")   
+
+community_id_df_projectiongraph  <- community_id_df %>% 
+  dplyr::filter(genus =="lawrencella"|family %in% levels(as.factor(df_param_all$neigh))) %>%
+  mutate(family = case_when(genus =="lawrencella" ~"conspecific",
+                            T~family)) %>%
+  aggregate(count ~ id.plot + collector +  family + year + scale.weight, sum) %>%
+  mutate(count=count/16) %>% 
+  rename("species" = family,
+        "abundance"= count) %>%
+  select(year, species, abundance)
+  
+community_id_df_projectiongraph.1 <- community_id_df_projectiongraph %>%
+  mutate(function.name ="1.Constant")
+community_id_df_projectiongraph.2 <- community_id_df_projectiongraph %>%
+  mutate(function.name ="2.Linear") %>%
+  bind_rows(community_id_df_projectiongraph.1)
+community_id_df_projectiongraph.3 <- community_id_df_projectiongraph %>%
+  mutate(function.name ="3.Exp") %>%
+  bind_rows(community_id_df_projectiongraph.2)
+community_id_df_projectiongraph.4 <- community_id_df_projectiongraph %>%
+  mutate(function.name ="4.Sigmoid")%>%
+  bind_rows(community_id_df_projectiongraph.3)
+
+allyear_communityprojection <- bind_rows(df_projection,
+                                         community_id_df_projectiongraph.4 )
+
+
+dummy <- data.frame(uplimit=c(600,300,100,100),
+                    function.name = c("1.Constant","2.Linear","3.Exp","4.Sigmoid"),
+                    stringsAsFactors=FALSE)
+
+plot_projection_list <- list()
+for( i in c("1.Constant","2.Linear","3.Exp","4.Sigmoid")){
+  df <- allyear_communityprojection %>%
+    dplyr::filter(function.name==i)
+  plot_projection_list[[i]] <- ggplot(df) +
+    annotate("rect", xmin=2010,xmax=2022,ymin=0,ymax=1000,
+             fill="lightgrey",alpha=0.3) + 
+    stat_summary(aes(y=abundance, x=year,
+                     group=species,color=species),
+                 fun.y = mean,
+                 fun.ymin = function(x) mean(x) - sd(x), 
+                 fun.ymax = function(x) mean(x) + sd(x), 
+                 geom = "pointrange",size=1) +
+    stat_summary(aes(y=abundance, x=year,
+                     group=species,color=species),
+                 fun.y = mean,
+                 geom = "line",size=1) +
+    scale_color_manual("Neighbours identity",values=cbp2) + 
+    theme_bw() +
+    labs(title = i,
+         y= "",
+         x="") +
+    rremove("ylab") + rremove("xlab") + 
+    guides(color= guide_legend(direction="vertical",
+                          byrow = TRUE,
+                          nrow = 8,
+                          title.hjust = 0.1)) +
+    coord_cartesian( xlim = NULL, ylim = c(0,dummy$uplimit[which(dummy$function.name==i)]),
+                     expand = TRUE, default = FALSE, clip = "on") +
+    scale_x_continuous(expand= c(0,0)) +
+    theme_bw() +
+    theme(plot.title = element_text(color="#000000",
+                                    vjust = 0,size=24),
+          strip.background = element_blank(), 
+          strip.placement = "outside",
+          strip.text =element_text(color="black",size=20),
+          legend.key= element_rect(fill = "white"),
+          legend.text=element_text(size=20),
+          legend.title=element_text(size=20),
+          axis.text.x = element_text(size=16),
+          axis.text.y = element_text(size=16),
+          legend.key.size = unit(1, 'cm'),
+          plot.margin = unit(c(0,0,0,0), 'lines'))
+  
+}
+
+plot_projection <- ggarrange( plotlist = plot_projection_list,
+           ncol=1,
+           align = c("hv"),
+           common.legend = T,
+           legend="right")
+
+plot_projection  <- annotate_figure(plot_projection  , 
+                              left = textGrob("Density at 25 x 25cm scale", 
+                                              rot = 90, vjust = 1, 
+                                              gp = gpar(fontsize=20,cex = 1.3)),
+                              bottom = textGrob("Time", hjust = 1.5, 
+                                                vjust = -0.5,
+                                                gp = gpar(fontsize=20,cex = 1.3)))
+
 plot_projection 
 
-community_id_df_fam <- ggplot() +
-  stat_summary(data=community_id_df_fam ,
-               aes(x=as.character(year), y = count,
-                   group=as.factor(family),color=as.factor(family)),
-               fun.y = median,
-               fun.ymin = function(x) median(x) - sd(x), 
-               fun.ymax = function(x) median(x) + sd(x), 
-               geom = "pointrange",size=2) +
-  stat_summary(data=community_id_df_fam ,
-               aes(x=as.character(year), y = count,
-                   group=as.factor(family),color=as.factor(family)),
-               fun.y = median,
-               geom = "line",size=1)+
-  scale_x_discrete("year",limits=c("2010","2011","2012-2014","2015","2016",
-                                   "2017","2018","2019","2020","2021","2022")) +
-  labs(color="family",y="Median number of individuals in 1meter squarred plot",
-       title="Density over time of annual plants in Perenjory region") +
-  coord_cartesian( xlim = NULL, ylim = c(0,200),expand = TRUE, default = FALSE, clip = "on") 
-  
-  community_id_df_fam 
+plot_projection_alpha <- ggarrange(plot_LAROalpha,
+                                   plot_projection, ncol=2, 
+                                   widths=c(1,1.5),align = c("hv"),
+          legend = "none", common.legend = F)
 
-ggsave(plot_projection, 
-       file = "figures/NatData_plot_projection.pdf")
+plot_projection_alpha
+
+ggsave(plot_projection_alpha, 
+       file = "figures/NatData_plot_projection_alpha.pdf")
 #---- 4.3. Compare model for each focal  ----
 # reference : Vehtari, A., Gelman, A., and Gabry, J. (2017). Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC. Statistics and Computing. 27(5), 1413–1432. :10.1007/s11222-016-9696-4. online, arXiv preprint arXiv:1507.04544.
 model.loo <- list()
 
-for(Code.focal in focal.levels){
+for(Code.focal in "LARO"){
   for (function.int in 1:4){ # c(1:4)
     if (Code.focal == "TROR") next
     
@@ -758,12 +853,13 @@ for(Code.focal in focal.levels){
       #as of loo v2.0.0 we can optionally provide relative effective sample sizes
       # when calling loo, which allows for better estimates of the PSIS effective
       # sample sizes and Monte Carlo error
-      r_eff <- loo::relative_eff(log_lik, cores = 2) 
+      r_eff <- loo::relative_eff(log_lik, cores = 3) 
       # preferably use more than 2 cores (as many cores as possible)
       # will use value of 'mc.cores' option if cores is not specified
       model.loo[[paste0(Code.focal,"_function_",function.int)]] <- loo::loo(log_lik,
+                                                                            threshold=0.7,
                                                                             r_eff = r_eff, 
-                                                                            cores = 2)
+                                                                            cores = 3)
       remove(FinalFit)
   }
 }
@@ -771,7 +867,7 @@ for(Code.focal in focal.levels){
 
 
 Se_loo_model <- NULL
-for(Code.focal in focal.levels){
+for(Code.focal in "LARO"){
   if (Code.focal == "TROR") next
     comp <- loo:loo_compare(model.loo[[paste0(Code.focal,"_function_1")]], 
                         model.loo[[paste0(Code.focal,"_","function_2")]],
@@ -797,20 +893,20 @@ write.csv(Se_loo_model,
           paste0("results/Se_loo_model.csv"))
 
 #---- 4.3. Figure of fecundity estimation distribution ----
-
+function.names <- c("1.Constant","2.Linear","3.Exp","4.Sigmoid")
   pdf(paste0("figures/NatData_PostFecundity_distribution.pdf")) 
   par(oma=c(0,0,0,0), mar=c(2.25,2.5,2,1))
   layout(mat = matrix(
-    1:16,
+    1:4,
     byrow=TRUE,
-    nrow = 4,
+    nrow = 1,
     ncol = 4
   ),
-  heights = rep(4,8),
-  widths = rep(3,8)
+  heights = rep(1,8),
+  widths = rep(4,8)
   )
   
-  for(Code.focal in focal.levels){ #,"j"
+  for(Code.focal in "LARO"){ #,"j"
     for (function.int in c(1:4)){ # c(1:4)
       if (Code.focal == "TROR") next
      #col2 <- c("black","#CC79A7","#E69F00","#009E73") # function 
@@ -830,7 +926,7 @@ write.csv(Se_loo_model,
       FinalPosteriors <- rstan::extract(FinalFit)
       stan_post_pred_check_all(FinalPosteriors,"F_hat",
                                Fec_df$Fec,
-                               paste0("Species ",Code.focal,",function ",function.int),
+                               function.names[function.int],
                                "black",
                                col2[1+function.int]#,#value.se
                                ) 
