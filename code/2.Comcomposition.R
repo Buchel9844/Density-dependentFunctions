@@ -8,7 +8,7 @@ df.min.abundance <- NULL
 nsims <- 750
 for(i in 1:nsims){
   for( function.int in 1:4){
-    for(add_external_factor in c("No external factor")){
+    for(add_external_factor in c("No external factor","Noisy change","Periodic change")){
       print(paste0("int ", i,"for funct ",function.int, add_external_factor))
       df.min.abundance.n <- df.sim[which(df.sim$sim.i == i &
                         df.sim$function.int == function.int &
@@ -72,6 +72,10 @@ df.min.abundance = data.table::fread("results/df.min.abundance.csv.gz")
 head(df.min.abundance)
 str(df.min.abundance)
 df.min.abundance <- df.min.abundance[,-1]
+levels(as.factor(df.min.abundance$function.name))
+
+
+
 
 # make it horyzontal
 df.min.abun.horyzontal <- full_join(df.min.abundance[which(df.min.abundance$focal =="Ni"),],
@@ -104,28 +108,34 @@ cols_interaction <- c("#661100", "#888888", "#6699CC", "#332288") # "#DDCC77","#
 safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
                              "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
 
-
-
-com.comp.plot <- ggplot(df.min.abun.horyzontal[df.min.abun.horyzontal$external_factor =="No external factor",],
-                            aes( fill=as.factor(comp.com),
-                                 x=as.factor(Interspecific.interaction) )) +
-
-  geom_bar()+
+df.min.abun.horyzontal$comp.com
+com.comp.plot.1 <- df.min.abun.horyzontal %>%
+  filter(external_factor =="No external factor" ) %>%
+  aggregate(sim  ~ comp.com + function.name, length) %>%
+  mutate(sim = sim/750) %>%
+  ggplot(aes( fill=as.factor(comp.com),
+                             x=as.factor(comp.com),
+              y=sim)) +
+  geom_bar(stat="identity")+
   #labels=c("run away population","no species","1-species","2-species")) +
   scale_color_manual(values = darken(cols_interaction, amount = .1)) + 
   #scale_pattern_fill_manual(values = my_cols) + 
   scale_fill_manual(
-  values = cols_interaction) + 
+    values = cols_interaction) + 
   facet_wrap(.~function.name,nrow=1) +
-  scale_y_continuous(limits=c(0,250), expand = c(0, 0)) +
- # scale_x_discrete(labels = c("run away","no species","one-species","two-species")) +
   theme_minimal() +
-  labs(y="Number of simulated communities", fill="Community trajectory",
-       x="Governing interaction")+
-       #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
+  labs(y="", fill="Community trajectory",
+       x="")+
+  #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
   guides(color="none") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1))+
+  scale_x_discrete(labels=c("run away\npopulation",
+                            "populations \nextincted",
+                            "one-species \npersisting",
+                            "two-species \npersisting")) + 
   theme( legend.key.size = unit(1, 'cm'),
          legend.position = "bottom",
+         panel.spacing.x = unit(10, "mm"),
          strip.background = element_blank(),
          panel.grid.minor = element_blank(),
          panel.grid.major.x = element_blank(),
@@ -133,13 +143,69 @@ com.comp.plot <- ggplot(df.min.abun.horyzontal[df.min.abun.horyzontal$external_f
          legend.text=element_text(size=20),
          legend.title=element_text(size=20),
          #axis.ticks.x=element_blank(),
-         axis.text.x= element_text(size=20, angle=66, hjust=1),
+         #axis.text.x= element_blank(),
+         axis.text.x= element_text(size=16, angle=66, hjust=1),
          axis.text.y= element_text(size=20),
          axis.title.x= element_text(size=24),
          axis.title.y= element_text(size=24),
-         title=element_text(size=16))
+         title=element_text(size=16),
+         plot.margin = unit(c(1,1,0,1), "cm"))
+com.comp.plot.1 
 
-com.comp.plot
+com.comp.plot.2 <- df.min.abun.horyzontal %>%
+  filter(external_factor =="No external factor" ) %>%
+  aggregate(sim  ~ comp.com + function.name + Interspecific.interaction, length) %>%
+  mutate(sim = sim/250) %>%
+  ggplot(aes( fill=as.factor(comp.com),
+              y=sim,
+              x=as.factor(Interspecific.interaction))) +
+
+  geom_bar(stat="identity")+
+  #labels=c("run away population","no species","1-species","2-species")) +
+  scale_color_manual(values = darken(cols_interaction, amount = .1)) + 
+  #scale_pattern_fill_manual(values = my_cols) + 
+  scale_fill_manual(
+  values = cols_interaction) + 
+  facet_wrap(.~function.name,nrow=1) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+ # scale_x_discrete(labels = c("run away","no species","one-species","two-species")) +
+  theme_minimal() +
+  labs(y="", fill="Community trajectory",
+       x="Governing interaction")+
+       #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
+  guides(color="none") +
+  theme( legend.key.size = unit(1, 'cm'),
+         legend.position = "bottom",
+         strip.background = element_blank(),
+         panel.spacing.x = unit(10, "mm"),
+         panel.grid.minor = element_blank(),
+         panel.grid.major.x = element_blank(),
+         strip.text = element_blank(),
+         legend.text=element_text(size=20),
+         legend.title=element_text(size=20),
+         #axis.ticks.x=element_blank(),
+         axis.text.x= element_text(size=16, angle=66, hjust=1),
+         axis.text.y= element_text(size=20),
+         axis.title.x= element_text(size=24),
+         axis.title.y= element_text(size=24),
+         plot.margin = unit(c(1,1,0,1), "cm"))
+
+com.comp.plot.2
+com.comp.plot <- ggarrange(com.comp.plot.1,com.comp.plot.2,
+         nrow=2, common.legend=T, legend="none", labels = c("a.","b."),
+         label.x = -0.5,
+         label.y = 1,
+         font.label = list(size = 20, 
+                           color = "black", face = "bold",
+                           family = NULL))
+
+
+com.comp.plot <- annotate_figure(com.comp.plot, 
+                                 left = textGrob("Percentage of simulated community",
+                                                 rot = 90, vjust = 2.5, hjust=0.3,
+                                                 gp = gpar(fontsize=18,cex = 1.3))) +
+  theme(plot.margin=grid::unit(c(0,-10,-10,-10), "mm"))
+com.comp.plot 
 ggsave(com.comp.plot,
        file = "figures/com.comp.plot.pdf")
 
