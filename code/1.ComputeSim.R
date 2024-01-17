@@ -44,11 +44,12 @@ alpha.coexistence <- function(species){
                          c("i", "j")))
   return(mat)
 }
+
 white.noise <- function(t.num){
-  e_noise = rnorm(t.num+1,mean=0, sd=0.1) 
+  e_noise = rnorm(t.num+1,mean=0, sd=0.4) 
   for( n in 1:sample(2:10)[1]){
     e_noise[n] <- rnorm(1,mean=0,
-                        sd=abs(rnorm(1, mean=0, sd=1)))
+                        sd=abs(rnorm(1, mean=0, sd=2)))
   }
   return( e_noise)
 }
@@ -89,7 +90,7 @@ for( n in c(1:2000)){
                               dimnames = list(c("i", "j"),
                                               c("i", "j"))),
               
-                    e_seasonal = sin((2*pi/20)*gen)*abs(rnorm(1,mean=0, sd=0.1)),
+                    e_seasonal = sin((2*pi/20)*gen)*abs(rnorm(1,mean=0, sd=0.4)),
                     e_noise = white.noise(t.num)
                   
                     )

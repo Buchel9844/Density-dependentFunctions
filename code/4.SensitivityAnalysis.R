@@ -18,8 +18,8 @@ library(truncnorm)
 df.sim.sens.std.unscale <- data.frame(function.int = c(df.stability.summary.small$function.int,df.stability.summary.small$function.int),
            function.name =c(df.stability.summary.small$function.name,df.stability.summary.small$function.name),
            stability =c(df.stability.summary.small$ratio.i,df.stability.summary.small$ratio.j),
-           alpha.decay.intra = c(df.stability.summary.small$a_slope.i.i,df.stability.summary.small$a_slope.j.j),
-           alpha.decay.inter = c(df.stability.summary.small$a_slope.i.j,df.stability.summary.small$a_slope.j.i),
+           alpha.hat.intra = c(df.stability.summary.small$a_slope.i.i,df.stability.summary.small$a_slope.j.j),
+           alpha.hat.inter = c(df.stability.summary.small$a_slope.i.j,df.stability.summary.small$a_slope.j.i),
            alpha.0.intra = c(df.stability.summary.small$a_initial.i.i,df.stability.summary.small$a_initial.j.j),
            alpha.0.inter = c(df.stability.summary.small$a_initial.i.j,df.stability.summary.small$a_initial.j.i),
            C.intra = c(df.stability.summary.small$c.i.i,df.stability.summary.small$c.j.j), 
@@ -28,8 +28,11 @@ df.sim.sens.std.unscale <- data.frame(function.int = c(df.stability.summary.smal
            N.opt.inter = c(df.stability.summary.small$Nmax.i.j,df.stability.summary.small$Nmax.j.i),
            comp.com =c(df.stability.summary.small$comp.com,df.stability.summary.small$comp.com),
            min.GR =c(df.stability.summary.small$min.GR.Ni,df.stability.summary.small$min.GR.Nj),
-           min.abundance =c(df.stability.summary.small$min.abundance.Ni,df.stability.summary.small$min.abundance.Nj))
+           min.abundance =c(df.stability.summary.small$min.abundance.Ni,df.stability.summary.small$min.abundance.Nj),
+           comp.com = c(df.stability.summary.small$comp.com,df.stability.summary.small$comp.com))
+levels(as.factor(df.sim.sens.std.unscale$comp.com))
 
+str(df.sim.sens.std.unscale)
 ggplot(df.sim.sens.std.unscale, aes(y= stability , 
                                     x=as.factor(function.int),
                                     color=function.int ))+ 
@@ -42,7 +45,7 @@ ggplot(df.sim.sens.std.unscale, aes(y= stability ,
   geom_boxplot()  +
   ylim(c(0,100))
 
-stand.variable <- c("alpha.decay.intra","alpha.decay.inter",
+stand.variable <- c("alpha.hat.intra","alpha.hat.inter",
                     "alpha.0.intra","alpha.0.inter",
                     "C.intra","C.inter",
                     "N.opt.intra","N.opt.inter")
@@ -50,17 +53,22 @@ names(df.sim.sens.std.unscale)
 df.sim.sens.std <- df.sim.sens.std.unscale
 df.sim.sens.std[,stand.variable] <- lapply(df.sim.sens.std.unscale[,stand.variable],
                                       scale)
-
+str(df.sim.sens.std)
 ###########################################################################################################
 # 4. Sensitivity analysis
 ##########################################################################################################
 #---- Sensitivity analysis -----
+df.sim.sens.std <- as.data.frame(df.sim.sens.std )
+
 df.sim.sens.std <- df.sim.sens.std %>%
+  dplyr::filter(comp.com == "one-species community" | comp.com =="two-species community") %>%
   mutate(stability = case_when(stability > 100 ~ 100,
                                is.na(stability) ~ 0,
                                T~stability),
          function.int = as.factor(function.int))
 
+levels(as.factor(df.sim.sens.std$comp.com))
+view(df.sim.sens.std)
 model.0 <- lm(stability ~ as.factor(function.int),
               df.sim.sens.std)
 
@@ -71,19 +79,19 @@ model.1 <- glm(formula(paste0("stability ~ ",
 
 model.2 <- glm(formula(paste0("stability~ ",
                              paste(c("alpha.0.intra","alpha.0.inter",
-                                     "alpha.decay.intra","alpha.decay.inter"),collapse = "+"))), 
+                                     "alpha.hat.intra","alpha.hat.inter"),collapse = "+"))), 
               data = df.sim.sens.std[which(df.sim.sens.std$function.int==2),])
 
 model.3 <- glm(formula(paste0("stability ~ ",
                              paste(c("alpha.0.intra","alpha.0.inter",
-                                     "alpha.decay.intra","alpha.decay.inter",
+                                     "alpha.hat.intra","alpha.hat.inter",
                                      "C.intra","C.inter",
                                      "N.opt.intra","N.opt.inter"),collapse = "+"))), 
               data = df.sim.sens.std[which(df.sim.sens.std$function.int==3),])
 
 model.4 <- glm(formula(paste0("stability~ ",
                              paste(c("alpha.0.intra","alpha.0.inter",
-                                     "alpha.decay.intra","alpha.decay.inter",
+                                     "alpha.hat.intra","alpha.hat.inter",
                                      "C.intra","C.inter",
                                      "N.opt.intra","N.opt.inter"),collapse = "+"))), 
               data = df.sim.sens.std[which(df.sim.sens.std$function.int==4),])
@@ -97,19 +105,19 @@ predict.1 <- bind_cols(df.sim.sens.std.unscale[which(df.sim.sens.std.unscale$fun
 predict.2 <- bind_cols(df.sim.sens.std.unscale[which(df.sim.sens.std.unscale$function.int==2),],
                        data.frame(predict.stability=predict(model.2,df.sim.sens.std[which(df.sim.sens.std$function.int==2),]))) %>%
   gather(c("alpha.0.intra","alpha.0.inter",
-           "alpha.decay.intra","alpha.decay.inter"),key="term",value="value")
+           "alpha.hat.intra","alpha.hat.inter"),key="term",value="value")
 
 predict.3 <- bind_cols(df.sim.sens.std.unscale[which(df.sim.sens.std.unscale$function.int==3),],
                        data.frame(predict.stability=predict(model.3,df.sim.sens.std[which(df.sim.sens.std$function.int==3),]))) %>%
   gather(c("alpha.0.intra","alpha.0.inter",
-           "alpha.decay.intra","alpha.decay.inter",
+           "alpha.hat.intra","alpha.hat.inter",
            "C.intra","C.inter",
            "N.opt.intra","N.opt.inter"),key="term",value="value")
 
 predict.4 <- bind_cols(df.sim.sens.std.unscale[which(df.sim.sens.std.unscale$function.int==4),],
                        data.frame(predict.stability=predict(model.4,df.sim.sens.std[which(df.sim.sens.std$function.int==4),]))) %>%
   gather(c("alpha.0.intra","alpha.0.inter",
-           "alpha.decay.intra","alpha.decay.inter",
+           "alpha.hat.intra","alpha.hat.inter",
            "C.intra","C.inter",
            "N.opt.intra","N.opt.inter"),key="term",value="value")
 
@@ -162,7 +170,7 @@ sens_out <- tidy(model.4) %>%
 sens_out$term <- factor(sens_out$term, 
                         levels = 
                           c("alpha.0.intra","alpha.0.inter",
-                            "alpha.decay.intra","alpha.decay.inter",
+                            "alpha.hat.intra","alpha.hat.inter",
                             "C.intra","C.inter",
                             "N.opt.intra","N.opt.inter")
 )
