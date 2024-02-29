@@ -29,9 +29,12 @@ df.sim.sens.std.unscale <- data.frame(function.int = c(df.stability.summary.smal
            comp.com =c(df.stability.summary.small$comp.com,df.stability.summary.small$comp.com),
            min.GR =c(df.stability.summary.small$min.GR.Ni,df.stability.summary.small$min.GR.Nj),
            min.abundance =c(df.stability.summary.small$min.abundance.Ni,df.stability.summary.small$min.abundance.Nj),
-           comp.com = c(df.stability.summary.small$comp.com,df.stability.summary.small$comp.com))
+           comp.com = c(df.stability.summary.small$comp.com,df.stability.summary.small$comp.com),
+           external_factor = c(df.stability.summary.small$external_factor,df.stability.summary.small$external_factor))
 levels(as.factor(df.sim.sens.std.unscale$comp.com))
 
+df.sim.sens.std.unscale <- df.sim.sens.std.unscale[which(df.sim.sens.std.unscale$external_factor =="No external factor"),]
+levels(as.factor(df.sim.sens.std.unscale$external_factor))
 str(df.sim.sens.std.unscale)
 ggplot(df.sim.sens.std.unscale, aes(y= stability , 
                                     x=as.factor(function.int),
@@ -51,24 +54,36 @@ stand.variable <- c("alpha.hat.intra","alpha.hat.inter",
                     "N.opt.intra","N.opt.inter")
 names(df.sim.sens.std.unscale)
 df.sim.sens.std <- df.sim.sens.std.unscale
-df.sim.sens.std[,stand.variable] <- lapply(df.sim.sens.std.unscale[,stand.variable],
-                                      scale)
+
+for( n in stand.variable){
+  
+  df.sim.sens.std[,n] <- scale(df.sim.sens.std[,n])[,1]
+}
+#df.sim.sens.std[,stand.variable] <- lapply(df.sim.sens.std.unscale[,stand.variable],
+                                     # scale)
 str(df.sim.sens.std)
 ###########################################################################################################
 # 4. Sensitivity analysis
 ##########################################################################################################
 #---- Sensitivity analysis -----
-df.sim.sens.std <- as.data.frame(df.sim.sens.std )
 
 df.sim.sens.std <- df.sim.sens.std %>%
   dplyr::filter(comp.com == "one-species community" | comp.com =="two-species community") %>%
-  mutate(stability = case_when(stability > 100 ~ 100,
-                               is.na(stability) ~ 0,
-                               T~stability),
-         function.int = as.factor(function.int))
-
-levels(as.factor(df.sim.sens.std$comp.com))
+  mutate(#stability = case_when(stability > 2 ~ 2,
+             #                  is.na(stability) ~ 0,
+              #                 T~stability),
+         stability = log(stability), 
+         function.int = as.factor(function.int)) %>%
+  dplyr::filter(!is.infinite(stability) | !is.na(stability))
+df.sim.sens.std <- df.sim.sens.std[!is.infinite(df.sim.sens.std$stability),]
 view(df.sim.sens.std)
+
+df.sim.sens.std <- df.sim.sens.std %>%
+ mutate(stability = case_when(stability > 1 ~ 1,
+                               stability < -1 ~ -1,
+                     T~stability)) %>%
+  filter(alpha.0.intra < 1 & alpha.0.intra > -1 )
+    
 model.0 <- lm(stability ~ as.factor(function.int),
               df.sim.sens.std)
 
@@ -96,25 +111,25 @@ model.4 <- glm(formula(paste0("stability~ ",
                                      "N.opt.intra","N.opt.inter"),collapse = "+"))), 
               data = df.sim.sens.std[which(df.sim.sens.std$function.int==4),])
 
-predict.1 <- bind_cols(df.sim.sens.std.unscale[which(df.sim.sens.std.unscale$function.int==1),],
+predict.1 <- bind_cols(df.sim.sens.std[which(df.sim.sens.std$function.int==1),],
             data.frame(predict.stability=predict(model.1,df.sim.sens.std[which(df.sim.sens.std$function.int==1),]))) %>%
   gather(c("alpha.0.intra","alpha.0.inter"),key="term",value="value")
 
 
 
-predict.2 <- bind_cols(df.sim.sens.std.unscale[which(df.sim.sens.std.unscale$function.int==2),],
+predict.2 <- bind_cols(df.sim.sens.std[which(df.sim.sens.std$function.int==2),],
                        data.frame(predict.stability=predict(model.2,df.sim.sens.std[which(df.sim.sens.std$function.int==2),]))) %>%
   gather(c("alpha.0.intra","alpha.0.inter",
            "alpha.hat.intra","alpha.hat.inter"),key="term",value="value")
 
-predict.3 <- bind_cols(df.sim.sens.std.unscale[which(df.sim.sens.std.unscale$function.int==3),],
+predict.3 <- bind_cols(df.sim.sens.std[which(df.sim.sens.std$function.int==3),],
                        data.frame(predict.stability=predict(model.3,df.sim.sens.std[which(df.sim.sens.std$function.int==3),]))) %>%
   gather(c("alpha.0.intra","alpha.0.inter",
            "alpha.hat.intra","alpha.hat.inter",
            "C.intra","C.inter",
            "N.opt.intra","N.opt.inter"),key="term",value="value")
 
-predict.4 <- bind_cols(df.sim.sens.std.unscale[which(df.sim.sens.std.unscale$function.int==4),],
+predict.4 <- bind_cols(df.sim.sens.std[which(df.sim.sens.std$function.int==4),],
                        data.frame(predict.stability=predict(model.4,df.sim.sens.std[which(df.sim.sens.std$function.int==4),]))) %>%
   gather(c("alpha.0.intra","alpha.0.inter",
            "alpha.hat.intra","alpha.hat.inter",
@@ -135,7 +150,7 @@ predict_sensitivity_plot <- predict %>%
   scale_color_manual(values = darken(my_cols, amount = .1)) + 
   scale_fill_manual(values = my_cols) + 
   facet_wrap(~term,nrow = 2,dir="v",scales="free") +
-  scale_y_continuous(limits=c(0,5)) +
+  scale_y_continuous(limits=c(-2,2)) +
   theme(legend.background = element_rect(color = "white"),
         legend.position ="right",
         legend.text = element_text(size = 10),

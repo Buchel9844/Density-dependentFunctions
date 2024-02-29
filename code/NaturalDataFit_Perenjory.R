@@ -94,6 +94,7 @@ competition.long <- competition.long.neigh %>%
   spread(family, abundance)  %>%# change this ti have grass /forb or native/exotic
   right_join(competition.long.focal)
 
+# Only run if not family
 competition.long <- competition.long.neigh %>%
   aggregate(abundance ~  functional.group + reserve + year + site + focal+ crop + site + plot + treatment, sum )%>%
   spread(functional.group, abundance)  %>%# change this ti have grass /forb or native/exotic
@@ -378,7 +379,7 @@ for(Code.focal in "LARO"){#focal.levels
 View(ModelCheck)
 
 write.csv(ModelCheck,
-          paste0("results/ModelCheck_LARO_",grouping,".csv.gz"))
+          paste0("results/ModelCheck_LARO_",grouping,".csv"))
 
 #---- 4.1 Alpha distribution ----
 
@@ -834,8 +835,6 @@ model.loo <- list()
 
 for(Code.focal in "LARO"){
   for (function.int in 1:4){ # c(1:4)
-    if (Code.focal == "TROR") next
-    
     if(ModelCheck[which(ModelCheck$function.int==function.int &
                        ModelCheck$focal==Code.focal),"Rhat"] < 0 | 
       ModelCheck[which(ModelCheck$function.int==function.int &
@@ -856,7 +855,7 @@ for(Code.focal in "LARO"){
       r_eff <- loo::relative_eff(log_lik, cores = 3) 
       # preferably use more than 2 cores (as many cores as possible)
       # will use value of 'mc.cores' option if cores is not specified
-      model.loo[[paste0(Code.focal,"_function_",function.int)]] <- loo::loo(log_lik,
+      model.loo[[paste0(Code.focal,"_function_",function.int)]] <-  loo::loo(log_lik,
                                                                             threshold=0.7,
                                                                             r_eff = r_eff, 
                                                                             cores = 3)
@@ -864,33 +863,26 @@ for(Code.focal in "LARO"){
   }
 }
 
-
-
 Se_loo_model <- NULL
 for(Code.focal in "LARO"){
-  if (Code.focal == "TROR") next
-    comp <- loo:loo_compare(model.loo[[paste0(Code.focal,"_function_1")]], 
+  Se_loo_model <- loo::loo_compare(model.loo[[paste0(Code.focal,"_function_1")]], 
                         model.loo[[paste0(Code.focal,"_","function_2")]],
                         model.loo[[paste0(Code.focal,"_","function_3")]],
                         model.loo[[paste0(Code.focal,"_","function_4")]])
-    model.loo[[Code.focal]] <- comp # The first column shows the difference in ELPD relative to the model with the largest ELPD.
-    
-    df_loo <- data.frame(se_diff = model.loo[[Code.focal]][,"se_diff"]) %>%
-      rownames_to_column(var = "model") %>%
-      mutate(model = stringi::stri_sub(model,from =6,to=6),
-             scenario = scenario,
-             focal = Code.focal)
-    
-    Se_loo_model <- bind_rows(Se_loo_model, df_loo)
-  }
-  assign(paste0("model.loo.",scenario),
-         model.loo)
-  list.name <- paste0("model.loo.",scenario)
-  save(Se_loo_model,
-       file = paste0("results/model.loo.",scenario,".RData"))
   
+
+  Se_loo_model <-as.data.frame(print(Se_loo_model, simplify = FALSE, digits = 3))
+  
+  }
+Se_loo_model<- Se_loo_model %>%
+  rownames_to_column(var="function.int") %>%
+  separate(col=function.int, 
+           into=c("model","function.int"),sep="l") %>%
+  dplyr::subset(-model)
+
+
 write.csv(Se_loo_model,
-          paste0("results/Se_loo_model.csv"))
+          paste0("results/LARO_Se_loo_model.csv"))
 
 #---- 4.3. Figure of fecundity estimation distribution ----
 function.names <- c("1.Constant","2.Linear","3.Exp","4.Sigmoid")
@@ -908,13 +900,12 @@ function.names <- c("1.Constant","2.Linear","3.Exp","4.Sigmoid")
   
   for(Code.focal in "LARO"){ #,"j"
     for (function.int in c(1:4)){ # c(1:4)
-      if (Code.focal == "TROR") next
      #col2 <- c("black","#CC79A7","#E69F00","#009E73") # function 
       col2 <- wes_palette("FantasticFox1", n = 5)
       #col1 <- c("blue","red") # focal species
       # loo values
-      #value.se <- round(Se_loo_model$se_diff[which(Se_loo_model$model == function.int &
-      #                                               Se_loo_model$focal == Code.focal)],digits=2)
+      value.se <- round(Se_loo_model$se_diff[which(Se_loo_model$model== paste0("model",function.int))],
+                        digits=2)
       # fecundity obs
       load(paste0("results/stan/Fsim_",Code.focal,"_function_",function.int,".RData"))
       # fecundity generated
@@ -928,7 +919,7 @@ function.names <- c("1.Constant","2.Linear","3.Exp","4.Sigmoid")
                                Fec_df$Fec,
                                function.names[function.int],
                                "black",
-                               col2[1+function.int]#,#value.se
+                               col2[1+function.int],value.se
                                ) 
       
       

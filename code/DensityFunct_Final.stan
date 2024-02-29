@@ -89,6 +89,7 @@ model{
    }
 
 }
+
 generated quantities{
   vector[N] F_sim;
     if(run_estimation==1){
