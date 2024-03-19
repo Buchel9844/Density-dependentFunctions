@@ -67,14 +67,15 @@ str(df.sim.sens.std)
 #---- Sensitivity analysis -----
 stability.distribution <- ggarrange(
   ggplot(df.sim.sens.std, aes(x=log(stability))) + 
-    geom_density() + labs(title="Skewed stability"),
+    geom_density() + labs(title="Skewed stability")+
+    theme_bw(),
   ggplot(df.sim.sens.std, aes(x=log(stability))) + 
     geom_density() +xlim(-7,7) +
-    labs(title="Stability to have a normal distribution")
-  
+    labs(title="Stability to have a normal distribution") +
+    theme_bw()
 )
-ggsave(stability.distribution,
-       "figures/stability.distribution.pdf", 
+ggsave("figures/stability.distribution.pdf", 
+       stability.distribution,
        width = 10, height = 8)
 
 
@@ -101,6 +102,11 @@ model.1 <- glm(formula(paste0("stability ~ ",
                              paste(c("alpha.0.intra","alpha.0.inter","alpha.0.intra:alpha.0.inter"),collapse = "+"))), 
               data = df.sim.sens.std[which(df.sim.sens.std$function.int==1),])
 
+df.glm <- summary(model.1)$coefficients %>%
+  as.data.frame() %>%
+  rownames_to_column(var="parameters") %>%
+  mutate(funct.form ="1.constant")
+
 pdf(file = "figures/glm.funct1.pdf",   # The directory you want to save the file in
     width = 8, # The width of the plot in inches
     height = 8)
@@ -120,6 +126,11 @@ model.2 <- glm(formula(paste0("stability~ ",
                                      "alpha.hat.intra*alpha.hat.inter"),collapse = "+"))), 
               data = df.sim.sens.std[which(df.sim.sens.std$function.int==2),])
 
+df.glm <- summary(model.2)$coefficients %>%
+  as.data.frame() %>%
+  rownames_to_column(var="parameters") %>%
+  mutate(funct.form ="2.linear") %>%
+  bind_rows(df.glm)
 
 pdf(file = "figures/glm.funct2.pdf",   # The directory you want to save the file in
     width = 8, # The width of the plot in inches
@@ -142,6 +153,12 @@ model.3 <- glm(formula(paste0("stability ~ ",
                                      "N.opt.intra*N.opt.inter"),collapse = "+"))), 
               data = df.sim.sens.std[which(df.sim.sens.std$function.int==3),])
 summary(model.3)
+df.glm <- summary(model.3)$coefficients %>%
+  as.data.frame() %>%
+  rownames_to_column(var="parameters") %>%
+  mutate(funct.form ="3.exp") %>%
+  bind_rows(df.glm)
+
 pdf(file = "figures/glm.funct3.pdf",   # The directory you want to save the file in
     width = 8, # The width of the plot in inches
     height = 8)
@@ -164,6 +181,14 @@ model.4 <- glm(formula(paste0("stability~ ",
                                      "N.opt.intra*N.opt.inter"),collapse = "+"))), 
               data = df.sim.sens.std[which(df.sim.sens.std$function.int==4),])
 summary(model.4)
+df.glm <- summary(model.4)$coefficients %>%
+  as.data.frame() %>%
+  rownames_to_column(var="parameters") %>%
+  mutate(funct.form ="4.sigmoid") %>%
+  bind_rows(df.glm)
+write.csv(df.glm, 
+          "results/df.glm.parameter.csv")
+
 pdf(file = "figures/glm.funct4.pdf",   # The directory you want to save the file in
     width = 8, # The width of the plot in inches
     height = 8)
