@@ -708,7 +708,7 @@ for(Code.focal in "LARO"){
                                      df_param_all$focal==Code.focal ),]
     param.df$g = 0.7
     param.df$s = 0.9
-  df_projection_n <- Ricker_solution_NatData(gens=gens,
+   df_projection_n <- Ricker_solution_NatData(gens=gens,
                                              state=state_df,
                                              pars = param.df)
 
