@@ -5,7 +5,7 @@ library(ggpattern)
 ##########################################################################################################
 df.sim <- as.data.frame(df.sim)
 df.min.abundance <- NULL
-nsims <- 750
+nsims <- 
 for(i in 1:nsims){
   for( function.int in 1:4){
     for(add_external_factor in c("No external factor","Noisy change","Periodic change")){
@@ -74,9 +74,6 @@ str(df.min.abundance)
 df.min.abundance <- df.min.abundance[,-1]
 levels(as.factor(df.min.abundance$function.name))
 
-
-
-
 # make it horyzontal
 df.min.abun.horyzontal <- full_join(df.min.abundance[which(df.min.abundance$focal =="Ni"),],
                                     df.min.abundance[which(df.min.abundance$focal =="Nj"),], suffix = c(".Ni",".Nj"),
@@ -112,7 +109,7 @@ df.min.abun.horyzontal$comp.com
 com.comp.plot.1 <- df.min.abun.horyzontal %>%
   filter(external_factor =="No external factor" ) %>%
   aggregate(sim  ~ comp.com + function.name, length) %>%
-  mutate(sim = sim/750) %>%
+  mutate(sim = sim/1500) %>%
   ggplot(aes( fill=as.factor(comp.com),
                              x=as.factor(comp.com),
               y=sim)) +
@@ -124,15 +121,15 @@ com.comp.plot.1 <- df.min.abun.horyzontal %>%
     values = cols_interaction) + 
   facet_wrap(.~function.name,nrow=1) +
   theme_minimal() +
-  labs(y="", fill="Community trajectory",
+  labs(y="Percentage of \nall simulated communities", fill="Community trajectory",
        x="")+
   #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
   guides(color="none") +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1))+
-  scale_x_discrete(labels=c("run away\npopulation",
-                            "populations \nextincted",
-                            "one-species \npersisting",
-                            "two-species \npersisting")) + 
+  scale_x_discrete(labels=c("run away",
+                            "extincted",
+                            "one-species",
+                            "two-species")) + 
   theme( legend.key.size = unit(1, 'cm'),
          legend.position = "bottom",
          panel.spacing.x = unit(10, "mm"),
@@ -144,10 +141,10 @@ com.comp.plot.1 <- df.min.abun.horyzontal %>%
          legend.title=element_text(size=20),
          #axis.ticks.x=element_blank(),
          #axis.text.x= element_blank(),
-         axis.text.x= element_text(size=16, angle=66, hjust=1),
+         axis.text.x= element_text(size=22, angle=66, hjust=0.85),
          axis.text.y= element_text(size=20),
-         axis.title.x= element_text(size=24),
-         axis.title.y= element_text(size=24),
+         axis.title.x= element_text(size=22),
+         axis.title.y= element_text(size=22),
          title=element_text(size=16),
          plot.margin = unit(c(1,1,0,1), "cm"))
 com.comp.plot.1 
@@ -155,11 +152,10 @@ com.comp.plot.1
 com.comp.plot.2 <- df.min.abun.horyzontal %>%
   filter(external_factor =="No external factor" ) %>%
   aggregate(sim  ~ comp.com + function.name + Interspecific.interaction, length) %>%
-  mutate(sim = sim/250) %>%
-  ggplot(aes( fill=as.factor(comp.com),
+  mutate(sim = sim/500) %>%
+  ggplot(aes( fill= as.factor(comp.com),
               y=sim,
               x=as.factor(Interspecific.interaction))) +
-
   geom_bar(stat="identity")+
   #labels=c("run away population","no species","1-species","2-species")) +
   scale_color_manual(values = darken(cols_interaction, amount = .1)) + 
@@ -170,7 +166,8 @@ com.comp.plot.2 <- df.min.abun.horyzontal %>%
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
  # scale_x_discrete(labels = c("run away","no species","one-species","two-species")) +
   theme_minimal() +
-  labs(y="", fill="Community trajectory",
+  labs(y="Percentage of simulated community \nwith main sign of net interaction outcome", 
+       fill="Community trajectory",
        x="Governing interaction")+
        #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
   guides(color="none") +
@@ -184,10 +181,10 @@ com.comp.plot.2 <- df.min.abun.horyzontal %>%
          legend.text=element_text(size=20),
          legend.title=element_text(size=20),
          #axis.ticks.x=element_blank(),
-         axis.text.x= element_text(size=16, angle=66, hjust=1),
+         axis.text.x= element_text(size=24, angle=66, hjust=0.8),
          axis.text.y= element_text(size=20),
-         axis.title.x= element_text(size=24),
-         axis.title.y= element_text(size=24),
+         axis.title.x= element_text(size=22),
+         axis.title.y= element_text(size=22),
          plot.margin = unit(c(1,1,0,1), "cm"))
 
 com.comp.plot.2
@@ -210,21 +207,26 @@ ggsave(com.comp.plot,
        file = "figures/com.comp.plot.pdf")
 
 # ALL
-com.comp.plot.all <- ggplot(df.min.abun.horyzontal,
-                            aes( fill=as.factor(comp.com),
-                                 x=as.factor(Interspecific.interaction) )) +
+com.comp.plot.all <- df.min.abun.horyzontal %>%
+  aggregate(sim  ~ comp.com + function.name + Interspecific.interaction +external_factor,
+            length) %>%
+  mutate(sim = sim/500) %>%
+  ggplot(aes(fill=as.factor(comp.com),
+             y=sim,
+             x=as.factor(Interspecific.interaction) )) +
   
-  geom_bar()+
+  geom_bar(stat="identity")+
   #labels=c("run away population","no species","1-species","2-species")) +
-  scale_color_manual(values = darken(cols_interaction, amount = .1)) + 
+  #scale_color_manual(values = darken(cols_interaction, amount = .1)) + 
   #scale_pattern_fill_manual(values = my_cols) + 
   scale_fill_manual(
     values = cols_interaction) + 
   facet_wrap(external_factor~function.name) +
-  scale_y_continuous(limits=c(0,250), expand = c(0, 0)) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
   # scale_x_discrete(labels = c("run away","no species","one-species","two-species")) +
   theme_minimal() +
-  labs(y="Number of simulated communities", fill="Community trajectory",
+  labs(y="Percentage of simulated community \nwith main sign of net interaction outcome", 
+       fill="Community trajectory",
        x=expression(paste("Initial interaction value", alpha['0,i,j'])))+
   #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
   guides(color="none") +
@@ -234,10 +236,10 @@ com.comp.plot.all <- ggplot(df.min.abun.horyzontal,
          panel.grid.minor = element_blank(),
          panel.grid.major.x = element_blank(),
          strip.text = element_text(size=20),
-         legend.text=element_text(size=16),
-         legend.title=element_text(size=16),
+         legend.text=element_text(size=20),
+         legend.title=element_text(size=20),
          #axis.ticks.x=element_blank(),
-         axis.text.x= element_text(size=16, angle=66, hjust=1),
+         axis.text.x= element_text(size=20, angle=66, hjust=1),
          axis.text.y= element_text(size=20),
          title=element_text(size=16))
 

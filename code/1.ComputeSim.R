@@ -24,12 +24,11 @@ library(grid)
 # 1. # 1. Compute Low- Density Growth Rates for wide range of parameters without coexistence restriction
 ##########################################################################################################
 source("code/PopProjection_toolbox.R")
-
 # define parameters
-nsims <- 750
+nsims <- 1500
 species <- 2
 function.int <- c(1:4)
-t.num = 500
+t.num = 200
 gen = seq(from=0, to=t.num , by=1)
 # run sim
 
@@ -45,11 +44,11 @@ alpha.coexistence <- function(species){
   return(mat)
 }
 
-white.noise <- function(t.num){
-  e_noise = rnorm(t.num+1,mean=0, sd=0.4) 
+white.noise <- function(t.num, b){
+  e_noise = rnorm(t.num+1,mean=0, sd= b) 
   for( n in 1:sample(2:10)[1]){
     e_noise[n] <- rnorm(1,mean=0,
-                        sd=abs(rnorm(1, mean=0, sd=2)))
+                        sd=abs(rnorm(1, mean=0, sd=b*5)))
   }
   return( e_noise)
 }
@@ -61,9 +60,10 @@ i <- 1
 init.facilitation_tally <- 0
 init.comp_tally <- 0
 init.faccomp_tally <- 0
-for( n in c(1:2000)){
+for( n in c(1:20000)){
   if(i==nsims+1) next
   print(paste(n,i,init.facilitation_tally,init.comp_tally,init.faccomp_tally))
+  b <-  sample(seq(0,2,0.01),1) # amplitude of external factor
     params[[i]] <- list(
                 # stable parameters
                     sim= i, 
@@ -89,9 +89,9 @@ for( n in c(1:2000)){
                                      data =runif(n=species*species, min=-1, max=0),
                               dimnames = list(c("i", "j"),
                                               c("i", "j"))),
-              
-                    e_seasonal = sin((2*pi/20)*gen)*abs(rnorm(1,mean=0, sd=0.4)),
-                    e_noise = white.noise(t.num)
+                    b =  b,
+                    e_seasonal = sin((2*pi/20)*gen)*abs(rnorm(1,mean=0, sd=b)),
+                    e_noise = white.noise(t.num, b)
                   
                     )
     
@@ -100,7 +100,7 @@ for( n in c(1:2000)){
     
     
     if(params[[i]]$a_initial[1,2] > 0 & params[[i]]$a_initial[2,1] > 0){
-      if(init.facilitation_tally >= 250) {
+      if(init.facilitation_tally >= nsims/3) {
         i = i 
         next
       }else{i = i + 1
@@ -110,7 +110,7 @@ for( n in c(1:2000)){
     }
     if((params[[i]]$a_initial[1,2] > 0 & params[[i]]$a_initial[2,1] < 0 )|
        (params[[i]]$a_initial[1,2] < 0 & params[[i]]$a_initial[2,1] > 0)){
-      if(init.faccomp_tally >= 250){
+      if(init.faccomp_tally >= nsims/3){
         i = i
         next
       }else{
@@ -121,7 +121,7 @@ for( n in c(1:2000)){
     }
         
     if(params[[i]]$a_initial[1,2] < 0 & params[[i]]$a_initial[2,1] < 0){
-      if(init.comp_tally >= 250){
+      if(init.comp_tally >= nsims/3){
         i = i
         next
       }else{
@@ -133,11 +133,11 @@ for( n in c(1:2000)){
       
 }
 
-#check all tally equal 250
+#check all tally equal nsims/3
 length(params)
-init.facilitation_tally ==250
-init.comp_tally==250
-init.faccomp_tally ==250
+init.facilitation_tally ==nsims/3
+init.comp_tally==nsims/3
+init.faccomp_tally ==nsims/3
 
 
 
@@ -147,7 +147,6 @@ load("results/sim_params.Rdata")
 
 df.sim  <- NULL
 
-t.num = 500 # number of generation
 set.seed(1608)
 for(i in 1:nsims){
   for( function.int in 1:4){
@@ -215,8 +214,8 @@ t.num= 100
 
 #---- Abundance through time with external factors----
   
-example.abundance.external.fact <- df.sim[which(df.sim$sim.i == 80 &
-                                                #df.sim$time < 51 &
+example.abundance.external.fact <- df.sim[which(df.sim$sim.i == 370 &
+                                                df.sim$time < 100 &
                                                 df.sim$invader == "both"),] %>%
   gather(Ni, Nj, key=species, value=abundance) %>%
   mutate(abundance = case_when(abundance > 5000 ~ 5000, 
@@ -245,7 +244,7 @@ example.abundance.external.fact <- df.sim[which(df.sim$sim.i == 80 &
          title=element_text(size=25))
 example.abundance.external.fact
  ggsave(example.abundance.external.fact,
-       file = "figures/example.abundance.external.fact.pdf")
+       file = "figures/example.abundance.external.fact.specific.case.pdf")
 
 
 #---- Abundance through time no external factors , two simulations ----

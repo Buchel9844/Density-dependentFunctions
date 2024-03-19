@@ -15,8 +15,8 @@ library(broom)
  source("code/TimeSerie_toolbox.R")
 df.stability <- as.data.frame(df.sim.comcomp[which(df.sim.comcomp$invader =="both"),])
  summary.df.stability <- NULL
- nsims <- 750
- t.num = 500 # number of generation
+ nsims <- 1500
+ t.num = 200 # number of generation
  stand.variable <- c(paste0("a_initial",c(".i.i",".j.j",".i.j",".j.i")),
                      paste0("a_slope",c(".i.i",".j.j",".i.j",".j.i")),
                      paste0("c",c(".i.i",".j.j",".i.j",".j.i")),
@@ -30,7 +30,7 @@ df.stability <- as.data.frame(df.sim.comcomp[which(df.sim.comcomp$invader =="bot
        print(paste0("int ", i,"for funct ",function.int, add_external_factor))
        
    df.stability.n <-  as.data.frame(df.stability[which(df.stability$sim.i == i & 
-                                           df.stability$time > 100 & 
+                                           df.stability$time > 99 & 
                                            df.stability$function.int == function.int &
                                            df.stability$external_fact == add_external_factor),] )
    comp.com.n <- df.stability.n$comp.com[1]
@@ -295,98 +295,8 @@ df.stability.summary.small <- df.stability.summary.small  %>%
                                    function.int==4 ~"4.Sigmoid"))
 
 
-summary.stability.plot <-  df.stability.summary.small %>%
-  filter(comp.com !="no species" & comp.com !="run away population") %>%
-  ggplot(aes(x=as.factor(stability.significance), 
-             pattern =as.factor(stability.significance),
-             fill=as.factor(significance))) + 
-  geom_bar_pattern(position="stack",color="black",
-                   pattern_spacing = 0.1,
-                   pattern_frequency = 1,
-                   pattern_density = 0.05,
-                   pattern_key_scale_factor = 0.8,
-                   pattern_fill="NA") +
-  scale_pattern_manual("Temporal stability \nreached by",
-                       values=c("crosshatch",'stripe',"none")) +
-  scale_fill_manual("Community dynamics",
-                    values=  safe_colorblind_palette_4 ) +
-  facet_wrap(external_factor~function.name, 
-              strip.position="bottom") + 
-  scale_y_continuous( expand= c(0,0)) +
- labs(y="Number of community",
-      x="interaction functional form") + 
-  guides(fill= guide_legend(override.aes = list(pattern = "none"),
-                                                direction="vertical",
-                                                byrow = TRUE,
-                                                nrow = 5,
-                                                title.hjust = 0.1),
-         pattern= guide_legend(override.aes = list(fill = "white",
-                                                   pattern_spacing = 0.01),
-                                                   nrow = 3,
-                                                   direction="vertical",
-                                                   byrow = TRUE,
-                                                   title.hjust = 0.1)) +
-  #facet_wrap(as.factor(external_factor)~., nrow=3) +
-  theme_minimal() +
-  theme(panel.background = element_blank(),
-        legend.position = "right",
-        legend.text = element_text(size = 20, 
-                                   hjust = 0, 
-                                   vjust = 0.5),
-        legend.title = element_text(size = rel(1.3)),
-        legend.key.width = unit(9, "mm"),
-        legend.key.height = unit(9, "mm"),
-        title = element_text(size = rel(2)),
-        #legend.spacing.y = unit(10, "mm"),
-        strip.background = element_blank(),
-        #title =element_text(size=16),
-        panel.grid = element_blank(),
-        panel.border =  element_blank(),
-        axis.title = element_text(size = 24),
-        axis.text.x= element_blank(),
-        axis.text.y= element_text(size=20),
-        #legend.text=element_text(size=16),
-        #legend.title=element_text(size=16),
-        strip.text = element_text(size = 24)) 
-  #theme_bw()
-
-summary.stability.plot 
-
-ggsave(summary.stability.plot, 
-       file = "figures/summary.stability.plot.all.pdf")
-
 #---- facet grid ----
 
-plot.persist.prob <- df.stability %>%
-    filter(external_factor =="No external factor" & 
-             time==1) %>%
-    mutate(coex.prob = case_when((comp.com =="no species"| 
-                                    comp.com =="run away population" ) ~ "Extinction",
-                                 comp.com =="one-species community" ~ "one-species community",
-                                 comp.com =="two-species community" ~ "two-species community")) %>%
-    aggregate(sim ~ coex.prob + function.name, length) %>%
-    mutate(sim = (sim /750)) %>%
-  ggplot() +
-  geom_bar(aes(x=as.factor(coex.prob), y=sim ), color="black",fill="white",
-           stat="identity") + 
-  facet_wrap(.~function.name, 
-             ncol=1, strip.position= "left") +
-  scale_y_continuous("Probability of prediction",
-                     labels = scales::percent_format(accuracy = 1)) +
-  scale_x_discrete("", 
-                   labels=c("extinction","one species\npersisting","two species\npersisting"))+
-  theme_minimal() +
-  theme(panel.spacing.y = unit(10, "mm"),
-        panel.grid.major.x  = element_blank(),
-        axis.title = element_text(size = 24),
-        axis.text.x= element_text(size=20, angle=66, vjust=0.6),
-        axis.text.y= element_text(size=20),
-        axis.title.y = element_blank(),
-        strip.background = element_blank(),
-        strip.text.y = element_text(angle = 180,size=20,vjust = 2), 
-        strip.placement = "outside",
-        plot.margin = unit(c(1,0,0,1), "cm")) 
-plot.persist.prob
 
 plot.stability.prob <-  df.stability.summary.small %>%
   filter(external_factor =="No external factor") %>%
@@ -436,6 +346,57 @@ plot.stability.prob
 
 ggsave(plot.stability.prob, 
        file = "figures/plot.stability.prob.pdf")
+
+
+plot.stability.prob.all <-  df.stability.summary.small %>%
+  mutate(stab.prob = case_when(stability.significance == "All species" & comp.com =="two-species community"~"2 stable species",
+                               stability.significance == "All species" & comp.com =="one-species community"~"1 stable species",
+                               stability.significance == "1 species out of 2" ~"1 stable species",
+                               stability.significance == "0 species" ~"0 species")) %>%
+  aggregate(sim ~ stab.prob + significance + function.name + external_factor, length) %>%
+  mutate(sim = (sim/750)) %>%
+  ggplot() +
+  geom_bar(aes(x=as.factor(stab.prob), y=sim, fill=significance ), color="black",
+           stat="identity") + 
+  facet_wrap(external_factor~function.name, 
+             nrow=3, strip.position= "top") +
+  scale_y_continuous("probability of detection\nfor a 1 or 2 species-community",
+                     labels = scales::percent_format(accuracy = 1)) +
+  scale_x_discrete("", 
+                   labels=c("no species\nstable","one species\nstable\n","two species\nstable\n"))+
+  scale_fill_manual("Community\ndynamics",
+                    labels=c("no detected\ndynamics","short\nsynchrony","long\nsynchrony",
+                             "long & short\nsynchrony","sychrony &\noscilattion"),
+                    values=  safe_colorblind_palette_4 ) +
+  guides(fill= guide_legend(override.aes = list(pattern = "none"),
+                            direction="vertical",
+                            byrow = TRUE,
+                            nrow = 5,
+                            title.hjust = 0.1)) +
+  theme_minimal() +
+  theme(panel.spacing.x = unit(10, "mm"),
+        panel.grid.major.x  = element_blank(),
+        legend.position = "right",
+        legend.text = element_text(size = 16, 
+                                   hjust = 0, 
+                                   vjust = 0.5),
+        legend.title = element_text(size = 18),
+        legend.key.width = unit(5, "mm"),
+        legend.key.height = unit(5, "mm"),
+        axis.title = element_text(size = 24),
+        axis.text.x= element_text(size=16,angle=66, vjust=0.6),
+        axis.text.y= element_text(size=20),
+        strip.background = element_blank(),
+        strip.text = element_text(size=20), 
+        strip.placement = "outside",
+        plot.margin = unit(c(1,0,0,1), "cm")) 
+plot.stability.prob.all
+
+ggsave(plot.stability.prob.all, 
+       file = "figures/plot.stability.prob.all.pdf")
+
+
+
 
 library(ggpubr)
 ggarrange(plot.persist.prob,plot.stability.prob,
