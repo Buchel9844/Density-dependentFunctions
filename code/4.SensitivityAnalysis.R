@@ -11,11 +11,12 @@ library(wesanderson)
 library(colorspace)
 library(broom)
 library(truncnorm)
+library(ggpubr)
 ###########################################################################################################
 # 1. Scale parameters for sensitivity analysis
 ###########################################################################################################
 
-df.sim.sens.std.unscale <- data.frame(function.int = c(df.stability.summary.small$function.int,df.stability.summary.small$function.int),
+df.sim.sens.std.unscale <- tibble(function.int = c(df.stability.summary.small$function.int,df.stability.summary.small$function.int),
            function.name =c(df.stability.summary.small$function.name,df.stability.summary.small$function.name),
            stability =c(df.stability.summary.small$ratio.i,df.stability.summary.small$ratio.j),
            alpha.hat.intra = c(df.stability.summary.small$a_slope.i.i,df.stability.summary.small$a_slope.j.j),
@@ -29,24 +30,22 @@ df.sim.sens.std.unscale <- data.frame(function.int = c(df.stability.summary.smal
            comp.com =c(df.stability.summary.small$comp.com,df.stability.summary.small$comp.com),
            min.GR =c(df.stability.summary.small$min.GR.Ni,df.stability.summary.small$min.GR.Nj),
            min.abundance =c(df.stability.summary.small$min.abundance.Ni,df.stability.summary.small$min.abundance.Nj),
-           comp.com = c(df.stability.summary.small$comp.com,df.stability.summary.small$comp.com),
            external_factor = c(df.stability.summary.small$external_factor,df.stability.summary.small$external_factor))
-levels(as.factor(df.sim.sens.std.unscale$comp.com))
 
-df.sim.sens.std.unscale <- df.sim.sens.std.unscale[which(df.sim.sens.std.unscale$external_factor =="No external factor"),]
-levels(as.factor(df.sim.sens.std.unscale$external_factor))
+ggplot(df.sim.sens.std.unscale,aes(x=comp.com)) +
+  geom_bar(stat="count")
+
+# only select the community with noise impacting the abundance, to avoid small variance which skew stability 
+df.sim.sens.std.unscale <- df.sim.sens.std.unscale %>%
+  filter(external_factor =="Noisy change" )
+
+
 str(df.sim.sens.std.unscale)
-ggplot(df.sim.sens.std.unscale, aes(y= stability , 
+ggplot(df.sim.sens.std.unscale, aes(y= log(stability ), 
                                     x=as.factor(function.int),
                                     color=function.int ))+ 
-  geom_boxplot()  +
-  ylim(c(0,100))
+  geom_boxplot()  
 
-ggplot(df.sim.sens.std.unscale, aes(y= stability , 
-                                    x=as.factor(function.int),
-                                    color=function.int ))+ 
-  geom_boxplot()  +
-  ylim(c(0,100))
 
 stand.variable <- c("alpha.hat.intra","alpha.hat.inter",
                     "alpha.0.intra","alpha.0.inter",
@@ -66,50 +65,121 @@ str(df.sim.sens.std)
 # 4. Sensitivity analysis
 ##########################################################################################################
 #---- Sensitivity analysis -----
+stability.distribution <- ggarrange(
+  ggplot(df.sim.sens.std, aes(x=log(stability))) + 
+    geom_density() + labs(title="Skewed stability"),
+  ggplot(df.sim.sens.std, aes(x=log(stability))) + 
+    geom_density() +xlim(-7,7) +
+    labs(title="Stability to have a normal distribution")
+  
+)
+ggsave(stability.distribution,
+       "figures/stability.distribution.pdf", 
+       width = 10, height = 8)
+
+
 
 df.sim.sens.std <- df.sim.sens.std %>%
   dplyr::filter(comp.com == "one-species community" | comp.com =="two-species community") %>%
-  mutate(#stability = case_when(stability > 2 ~ 2,
-             #                  is.na(stability) ~ 0,
-              #                 T~stability),
-         stability = log(stability), 
+  mutate(stability = log(stability), 
          function.int = as.factor(function.int)) %>%
-  dplyr::filter(!is.infinite(stability) | !is.na(stability))
-df.sim.sens.std <- df.sim.sens.std[!is.infinite(df.sim.sens.std$stability),]
-view(df.sim.sens.std)
+  dplyr::filter(!is.infinite(stability) | !is.na(stability)) %>%
+  dplyr::filter(stability < 7 & stability > -7)
 
-df.sim.sens.std <- df.sim.sens.std %>%
- mutate(stability = case_when(stability > 1 ~ 1,
-                               stability < -1 ~ -1,
-                     T~stability)) %>%
-  filter(alpha.0.intra < 1 & alpha.0.intra > -1 )
-    
+
+df.sim.sens.std <- df.sim.sens.std[!is.infinite(df.sim.sens.std$stability),]
+#view(df.sim.sens.std) 
+#---- run glms for each function with specific parameters----
 model.0 <- lm(stability ~ as.factor(function.int),
               df.sim.sens.std)
+par(mfrow=c(2,2)) # Change the panel layout to 2 x 2
+plot(model.0)
+par(mfrow=c(1,1))
+
 
 model.1 <- glm(formula(paste0("stability ~ ",
-                             paste(c("alpha.0.intra","alpha.0.inter"),collapse = "+"))), 
+                             paste(c("alpha.0.intra","alpha.0.inter","alpha.0.intra:alpha.0.inter"),collapse = "+"))), 
               data = df.sim.sens.std[which(df.sim.sens.std$function.int==1),])
+
+pdf(file = "figures/glm.funct1.pdf",   # The directory you want to save the file in
+    width = 8, # The width of the plot in inches
+    height = 8)
+par(mfrow=c(2,2)) # Change the panel layout to 2 x 2
+plot(model.1)
+mtext(paste0("function 1 \n stability ~ ",
+                paste(c("alpha.0.intra","alpha.0.inter",
+                        "alpha.0.intra:alpha.0.inter"),
+                      collapse = "+")),
+      side = 3, line = - 2.5, outer = TRUE)
+par(mfrow=c(1,1))
+dev.off()
 
 
 model.2 <- glm(formula(paste0("stability~ ",
-                             paste(c("alpha.0.intra","alpha.0.inter",
-                                     "alpha.hat.intra","alpha.hat.inter"),collapse = "+"))), 
+                             paste(c("alpha.0.intra*alpha.0.inter",
+                                     "alpha.hat.intra*alpha.hat.inter"),collapse = "+"))), 
               data = df.sim.sens.std[which(df.sim.sens.std$function.int==2),])
 
+
+pdf(file = "figures/glm.funct2.pdf",   # The directory you want to save the file in
+    width = 8, # The width of the plot in inches
+    height = 8)
+par(mfrow=c(2,2)) # Change the panel layout to 2 x 2
+plot(model.2)
+mtext(paste0("function 2 \n stability ~ ",
+             paste(c("alpha.0.intra*alpha.0.inter",
+                     "alpha.hat.intra*alpha.hat.inter"),
+                   collapse = "+")),
+      side = 3, line = - 2.5, outer = TRUE)
+par(mfrow=c(1,1))
+dev.off()
+
+
 model.3 <- glm(formula(paste0("stability ~ ",
-                             paste(c("alpha.0.intra","alpha.0.inter",
-                                     "alpha.hat.intra","alpha.hat.inter",
-                                     "C.intra","C.inter",
-                                     "N.opt.intra","N.opt.inter"),collapse = "+"))), 
+                             paste(c("alpha.0.intra*alpha.0.inter",
+                                     "alpha.hat.intra*alpha.hat.inter",
+                                     "C.intra*C.inter",
+                                     "N.opt.intra*N.opt.inter"),collapse = "+"))), 
               data = df.sim.sens.std[which(df.sim.sens.std$function.int==3),])
+summary(model.3)
+pdf(file = "figures/glm.funct3.pdf",   # The directory you want to save the file in
+    width = 8, # The width of the plot in inches
+    height = 8)
+par(mfrow=c(2,2)) # Change the panel layout to 2 x 2
+plot(model.3)
+mtext(paste0("function 3 \n stability ~ ",
+             paste(c("alpha.0.intra*alpha.0.inter",
+                     "alpha.hat.intra*alpha.hat.inter",
+                     "C.intra*C.inter",
+                     "N.opt.intra*N.opt.inter"),
+                   collapse = "+")),
+      side = 3, line = - 2.5, outer = TRUE)
+par(mfrow=c(1,1))
+dev.off()
 
 model.4 <- glm(formula(paste0("stability~ ",
-                             paste(c("alpha.0.intra","alpha.0.inter",
-                                     "alpha.hat.intra","alpha.hat.inter",
-                                     "C.intra","C.inter",
-                                     "N.opt.intra","N.opt.inter"),collapse = "+"))), 
+                             paste(c("alpha.0.intra*alpha.0.inter",
+                                     "alpha.hat.intra*alpha.hat.inter",
+                                     "C.intra*C.inter",
+                                     "N.opt.intra*N.opt.inter"),collapse = "+"))), 
               data = df.sim.sens.std[which(df.sim.sens.std$function.int==4),])
+summary(model.4)
+pdf(file = "figures/glm.funct4.pdf",   # The directory you want to save the file in
+    width = 8, # The width of the plot in inches
+    height = 8)
+par(mfrow=c(2,2)) # Change the panel layout to 2 x 2
+plot(model.4)
+mtext(paste0("function 4 \n stability ~ ",
+             paste(c("alpha.0.intra*alpha.0.inter",
+                     "alpha.hat.intra*alpha.hat.inter",
+                     "C.intra*C.inter",
+                     "N.opt.intra*N.opt.inter"),
+                   collapse = "+")),
+      side = 3, line = - 2.5, outer = TRUE)
+par(mfrow=c(1,1))
+dev.off()
+
+#---- predict glms trends for each parameters----
 
 predict.1 <- bind_cols(df.sim.sens.std[which(df.sim.sens.std$function.int==1),],
             data.frame(predict.stability=predict(model.1,df.sim.sens.std[which(df.sim.sens.std$function.int==1),]))) %>%
@@ -144,20 +214,19 @@ my_cols <- c("#AA4499", "#DDCC77","#88CCEE", "#44AA99")
 predict_sensitivity_plot <- predict %>%
   ggplot(aes(x=value,color=function.name,fill=function.name)) +
   #geom_smooth(aes(y=predict.stability), se=FALSE)+
-  geom_point(aes(y=log(stability+1)),alpha=0.1,size=0.5) +
-  geom_smooth(aes(y=log(predict.stability+1)))+
+  geom_point(aes(y=stability),alpha=0.1,size=0.5) +
+  geom_smooth(aes(y=predict.stability))+
   theme_bw() +
   scale_color_manual(values = darken(my_cols, amount = .1)) + 
   scale_fill_manual(values = my_cols) + 
   facet_wrap(~term,nrow = 2,dir="v",scales="free") +
-  scale_y_continuous(limits=c(-2,2)) +
   theme(legend.background = element_rect(color = "white"),
         legend.position ="right",
         legend.text = element_text(size = 10),
         legend.title = element_blank(),
         legend.key.size = unit(0.5, units = "in"))+
   #facet_wrap(~comp, nrow = 2) +
-  labs(title="Prediction of parameters' effect for each function on the stability of one species in 2-species community",
+  labs(title="Prediction of parameters' effect \nfor each function on the stability of one species in 2-species communities",
        y = "Stability ratio (log+1) \nlow values equal lower stability and < 1 is unstable",
        x = "Range of value specific to the parameters, from low to high",
        fill = "function", color = "function") 
@@ -165,6 +234,8 @@ predict_sensitivity_plot <- predict %>%
 predict_sensitivity_plot
 ggsave("figures/predict_sensitivity_plot.pdf", 
        width = 10, height = 8)
+
+#---- See effect size of each parameters----
 
 
 sens_out <- tidy(model.4) %>% 
@@ -212,7 +283,7 @@ int_sensitivity_plot <- sens_out %>%
         legend.text = element_text(size = 16),
         legend.title = element_blank(),
         legend.key.size = unit(0.1, units = "in"),
-        title = element_text(size = 18),
+        title = element_text(size = 16),
         axis.text.y = element_text(size = 16, angle = 0, 
                                    hjust = 1, margin = margin(t =10)),
         
@@ -220,11 +291,11 @@ int_sensitivity_plot <- sens_out %>%
                                    hjust = 1, margin = margin(t =10)),
         axis.title.x = element_text(size = 18)) +
   #facet_wrap(~comp, nrow = 2) +
-  labs(title="Effect size of parameters for each function on the stability of one species\nin 2-species community",
+  labs(title="Effect size of parameters for each function on the stability \nof one species in 2-species community",
        y = "", x = "Effect Size on Stability of i \n ratio mean/var", fill = "", color = "") 
 
 int_sensitivity_plot
-ggsave("figures/sensitivity_analysis_stability.pdf", 
+ggsave("figures/sensitivity_analysis_stability_filter.pdf", 
        width = 10, height = 8)
 
 # plot probability of each function to have coexistence
