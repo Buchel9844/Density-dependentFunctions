@@ -1,5 +1,6 @@
 library(IDPmisc) # for function NaRV.omit()
 library(ggpattern)
+library(ggpubr)
 ##########################################################################################################
 # 1. minimum  abundance
 ##########################################################################################################
@@ -168,7 +169,7 @@ com.comp.plot.2 <- df.min.abun.horyzontal %>%
   theme_minimal() +
   labs(y="Percentage of simulated community \nwith main sign of net interaction outcome", 
        fill="Community trajectory",
-       x="Governing interaction")+
+       x="Primary interactions")+
        #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
   guides(color="none") +
   theme( legend.key.size = unit(1, 'cm'),
@@ -183,7 +184,7 @@ com.comp.plot.2 <- df.min.abun.horyzontal %>%
          #axis.ticks.x=element_blank(),
          axis.text.x= element_text(size=24, angle=66, hjust=0.8),
          axis.text.y= element_text(size=20),
-         axis.title.x= element_text(size=22),
+         axis.title.x= element_text(size=26),
          axis.title.y= element_text(size=22),
          plot.margin = unit(c(1,1,0,1), "cm"))
 

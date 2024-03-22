@@ -305,7 +305,7 @@ plot.stability.prob <-  df.stability.summary.small %>%
                                stability.significance == "1 species out of 2" ~"1 stable species",
                                stability.significance == "0 species" ~"0 species")) %>%
   aggregate(sim ~ stab.prob + significance + function.name, length) %>%
-  mutate(sim = (sim/750)) %>%
+  mutate(sim = (sim/1500)) %>%
   ggplot() +
   geom_bar(aes(x=as.factor(stab.prob), y=sim, fill=significance ), color="black",
            stat="identity") + 
@@ -335,10 +335,10 @@ plot.stability.prob <-  df.stability.summary.small %>%
         legend.key.width = unit(5, "mm"),
         legend.key.height = unit(5, "mm"),
         axis.title = element_text(size = 24),
-        axis.text.x= element_text(size=16,angle=66, vjust=0.8),
-        axis.text.y= element_text(size=20),
+        axis.text.x= element_text(size=24,angle=66, vjust=0.8),
+        axis.text.y= element_text(size=22),
         strip.background = element_blank(),
-        strip.text = element_text(size=20), 
+        strip.text = element_text(size=23), 
         strip.placement = "outside",
         plot.margin = unit(c(1,0,0,1), "cm")) 
 plot.stability.prob

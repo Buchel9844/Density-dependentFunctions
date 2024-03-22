@@ -562,50 +562,60 @@ plot_LAROalpha_list <- list()
 
 for( i in c("1.Constant","2.Linear","3.Exp","4.Sigmoid")){
   df <- df_funct_alpha %>%
-    dplyr::filter(focal == "LARO" & function.name==i)
+    dplyr::filter(focal == "LARO" & function.name==i) %>%
+    mutate(neigh = factor(neigh, 
+                          levels = c("conspecific",family.neigh)))
   plot_LAROalpha_list[[i]] <- ggplot(df,
                                        aes(x=density, y= alpha_value,
-      color=neigh,fill=neigh)) +
-    stat_smooth(method = 'gam',se = TRUE,level =0.95,size=2) +
+      color=neigh,fill=neigh,size=neigh,alpha=neigh)) +
+    geom_line(stat="smooth",method = 'gam',se = TRUE,level =0.95,aes(size=neigh,alpha=neigh)) +
+    #stat_smooth(method = 'gam',se = TRUE,level =0.95,aes(size=neigh,alpha=neigh)) +
+    geom_hline(yintercept=0, color="black", linetype="dashed",size=2, alpha=0.6) +
     scale_color_manual("Neighbours identity",values=cbp2) + 
     scale_fill_manual("Neighbours identity",
                       values=cbp2) + 
+    scale_size_manual("Neighbours identity",values=c(3, rep(1.5,length(family.neigh)))) + 
+    scale_alpha_manual("Neighbours identity",values=c(1, rep(0.8,length(family.neigh)))) + 
     theme_bw() +
     labs(title = i ,
       y= "Per capita effect of neighbours on focal",
       x="density of neighbours") +
     rremove("ylab") + rremove("xlab") + 
+    scale_x_continuous( expand= c(0,0),minor_breaks = NULL) +
+    scale_y_continuous(expand= c(0,0),minor_breaks = NULL) +
+    guides(color= "none",fill="none",size="none",alpha="none") +
     coord_cartesian( xlim = NULL, 
-                     ylim = c(dummy$downlimit[which(dummy$function.name==i)],
-                     dummy$uplimit[which(dummy$function.name==i)]),
+                     ylim=c(-1,1),
+                     #ylim = c(dummy$downlimit[which(dummy$function.name==i)],
+                     #dummy$uplimit[which(dummy$function.name==i)]),
                      expand = TRUE, default = FALSE, clip = "on") +
-    scale_x_continuous( expand= c(0,0)) +
-    geom_hline(yintercept=0, color="black", linetype="dashed") +
-    guides(color= "none",fill="none") +
     theme(plot.title = element_text(color="#000000",
                                     vjust = 0,
                                     size=24),
+          
           strip.background = element_blank(), 
           strip.placement = "outside",
           strip.text =element_text(color="black",size=20),
           legend.key= element_rect(fill = "white"),
           legend.text=element_text(size=20),
           legend.title=element_text(size=20),
-          axis.text.x = element_text(size=16),
-          axis.text.y = element_text(size=16),
+          axis.text.x = element_text(size=16,face  = "bold"),
+          axis.text.y = element_text(size=16,face="bold"),
           legend.key.size = unit(1, 'cm'),
           plot.margin = unit(c(0,0,0,0), 'lines')) 
   
 }
+
 plot_LAROalpha <- ggarrange( plotlist = plot_LAROalpha_list,
                               ncol=1,align = c("hv"),
                               common.legend = F)
 
 plot_LAROalpha <- annotate_figure(plot_LAROalpha , 
-                                  left = textGrob("Per capita effect of neighbours on focal", rot = 90, vjust = 1, 
+                                  left = textGrob("Per capita effect of neighbours on focal", 
+                                                  rot = 90, vjust = 0.5, #hjust=1, 
                                                   gp = gpar(fontsize=20,cex = 1.3)),
                                   bottom = textGrob("Density of neighbours",  
-                                                    gp = gpar(fontsize=20,cex = 1.3)))
+                                                    gp = gpar(fontsize=20,cex = 1.3))) 
 plot_LAROalpha
 ggsave(plot_LAROalpha,
        file = "figures/NatData_plot_LARO.pdf")
@@ -758,24 +768,33 @@ dummy <- data.frame(uplimit=c(600,300,100,100),
                     function.name = c("1.Constant","2.Linear","3.Exp","4.Sigmoid"),
                     stringsAsFactors=FALSE)
 
+family.neigh <-levels(as.factor(allyear_communityprojection$species))
+family.neigh <-  family.neigh[!family.neigh =="conspecific"]
+
 plot_projection_list <- list()
 for( i in c("1.Constant","2.Linear","3.Exp","4.Sigmoid")){
   df <- allyear_communityprojection %>%
-    dplyr::filter(function.name==i)
-  plot_projection_list[[i]] <- ggplot(df) +
+    dplyr::filter(function.name==i) %>%
+    mutate(species = factor(species, 
+                            levels = c("conspecific",family.neigh)))
+    plot_projection_list[[i]] <- ggplot(df) +
     annotate("rect", xmin=2010,xmax=2022,ymin=0,ymax=1000,
              fill="lightgrey",alpha=0.3) + 
     stat_summary(aes(y=abundance, x=year,
-                     group=species,color=species),
+                     group=species,color=species,
+                     size =species, alpha=species),
                  fun.y = mean,
                  fun.ymin = function(x) mean(x) - sd(x), 
                  fun.ymax = function(x) mean(x) + sd(x), 
-                 geom = "pointrange",size=1) +
+                 geom = "pointrange") +
     stat_summary(aes(y=abundance, x=year,
-                     group=species,color=species),
+                     group=species,color=species,
+                     size =species, alpha=species),
                  fun.y = mean,
-                 geom = "line",size=1) +
+                 geom = "line") +
     scale_color_manual("Neighbours identity",values=cbp2) + 
+    scale_size_manual("Neighbours identity",values=c(1.5, rep(1,length(family.neigh)))) + 
+   scale_alpha_manual("Neighbours identity",values=c(1, rep(0.8,length(family.neigh)))) + 
     theme_bw() +
     labs(title = i,
          y= "",
@@ -785,9 +804,10 @@ for( i in c("1.Constant","2.Linear","3.Exp","4.Sigmoid")){
                           byrow = TRUE,
                           nrow = 8,
                           title.hjust = 0.1)) +
-    coord_cartesian( xlim = NULL, ylim = c(0,dummy$uplimit[which(dummy$function.name==i)]),
-                     expand = TRUE, default = FALSE, clip = "on") +
-    scale_x_continuous(expand= c(0,0)) +
+    coord_cartesian( xlim = NULL,ylim =c(0,300),# ylim = c(0,dummy$uplimit[which(dummy$function.name==i)]),
+                     expand = F, default = FALSE, clip = "on") +
+    scale_x_continuous(expand= c(0,0),minor_breaks = NULL) +
+    scale_y_continuous(expand= c(0,0),minor_breaks = NULL) +
     theme_bw() +
     theme(plot.title = element_text(color="#000000",
                                     vjust = 0,size=24),
@@ -804,26 +824,29 @@ for( i in c("1.Constant","2.Linear","3.Exp","4.Sigmoid")){
   
 }
 
+library(grid)
 plot_projection <- ggarrange( plotlist = plot_projection_list,
            ncol=1,
-           align = c("hv"),
+           align = c("v"),
            common.legend = T,
            legend="right")
 
 plot_projection  <- annotate_figure(plot_projection  , 
                               left = textGrob("Density at 25 x 25cm scale", 
-                                              rot = 90, vjust = 1, 
+                                              rot = 90, vjust = 0.5,
                                               gp = gpar(fontsize=20,cex = 1.3)),
-                              bottom = textGrob("Time", hjust = 1.5, 
-                                                vjust = -0.5,
-                                                gp = gpar(fontsize=20,cex = 1.3)))
+                              #bottom = textGrob("Time", hjust = 1.5, 
+                              #                  #vjust = -0.5,
+                              #                  gp = gpar(fontsize=20,cex = 1.3))
+                              )+
+  theme(plot.margin = unit(c(0,0,2,2), 'lines'))
 
 plot_projection 
 
 plot_projection_alpha <- ggarrange(plot_LAROalpha,
                                    plot_projection, ncol=2, 
-                                   widths=c(1,1.5),align = c("hv"),
-          legend = "none", common.legend = F)
+                                   widths=c(1,2),
+          legend = "none", common.legend = F) 
 
 plot_projection_alpha
 
