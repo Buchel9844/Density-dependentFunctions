@@ -150,6 +150,7 @@ stan_post_pred_check_all <- function(post.draws,
   disp_dev <- post.draws$disp_dev
   phi <- (disp_dev^2)^(-1)
   
+  
   # generating posterior predictions
   seed_pred <- matrix(nrow = dim(mu)[1], ncol = dim(mu)[2])
   for (i in 1:dim(mu)[1]) {     # for each posterior draw

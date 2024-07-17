@@ -108,21 +108,26 @@ safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#33228
 
 df.min.abun.horyzontal$comp.com
 com.comp.plot.1 <- df.min.abun.horyzontal %>%
+  mutate(function.name = case_when(function.int==1 ~"1.Traditional",
+                                   function.int==2 ~"2.Linear",
+                                   function.int==3 ~"3.Exp",
+                                   function.int==4 ~"4.Sigmoid")) %>%
   filter(external_factor =="No external factor" ) %>%
   aggregate(sim  ~ comp.com + function.name, length) %>%
   mutate(sim = sim/1500) %>%
   ggplot(aes( fill=as.factor(comp.com),
                              x=as.factor(comp.com),
               y=sim)) +
-  geom_bar(stat="identity")+
+  geom_bar(stat="identity",color="black")+
   #labels=c("run away population","no species","1-species","2-species")) +
-  scale_color_manual(values = darken(cols_interaction, amount = .1)) + 
+  #scale_color_manual(values = darken(cols_interaction,
+  #                                   amount = .1)) + 
   #scale_pattern_fill_manual(values = my_cols) + 
   scale_fill_manual(
     values = cols_interaction) + 
   facet_wrap(.~function.name,nrow=1) +
   theme_minimal() +
-  labs(y="Percentage of \nall simulated communities", fill="Community trajectory",
+  labs(y="Percentage of \n simulated communities", fill="Community trajectory",
        x="")+
   #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
   guides(color="none") +
@@ -133,63 +138,79 @@ com.comp.plot.1 <- df.min.abun.horyzontal %>%
                             "two-species")) + 
   theme( legend.key.size = unit(1, 'cm'),
          legend.position = "bottom",
-         panel.spacing.x = unit(10, "mm"),
          strip.background = element_blank(),
+         panel.spacing.x = unit(10, "mm"),
          panel.grid.minor = element_blank(),
          panel.grid.major.x = element_blank(),
-         strip.text = element_text(size=28),
-         legend.text=element_text(size=20),
-         legend.title=element_text(size=20),
-         #axis.ticks.x=element_blank(),
-         #axis.text.x= element_blank(),
-         axis.text.x= element_text(size=22, angle=66, hjust=0.85),
-         axis.text.y= element_text(size=20),
-         axis.title.x= element_text(size=22),
-         axis.title.y= element_text(size=22),
-         title=element_text(size=16),
-         plot.margin = unit(c(1,1,0,1), "cm"))
+         legend.text = element_text(size = 16, 
+                                    hjust = 0, 
+                                    vjust = 0.5),
+         legend.title = element_text(size = 18),
+         axis.title = element_text(size = 24),
+         axis.text.x= element_text(size=20,angle=76, vjust=0.73),
+         axis.text.y= element_text(size=22),
+         axis.title.y= element_blank(),
+         strip.text = element_text(size=23), 
+         plot.margin = unit(c(1,1,0,2), "cm"))
 com.comp.plot.1 
 
 com.comp.plot.2 <- df.min.abun.horyzontal %>%
+  mutate(function.name = case_when(function.int==1 ~"1.Traditional",
+                                   function.int==2 ~"2.Linear",
+                                   function.int==3 ~"3.Exp",
+                                   function.int==4 ~"4.Sigmoid")) %>%
   filter(external_factor =="No external factor" ) %>%
   aggregate(sim  ~ comp.com + function.name + Interspecific.interaction, length) %>%
   mutate(sim = sim/500) %>%
   ggplot(aes( fill= as.factor(comp.com),
               y=sim,
               x=as.factor(Interspecific.interaction))) +
-  geom_bar(stat="identity")+
+  geom_bar(stat="identity",color="black") +
   #labels=c("run away population","no species","1-species","2-species")) +
-  scale_color_manual(values = darken(cols_interaction, amount = .1)) + 
+  #scale_color_manual(values = darken(cols_interaction, amount = .1)) + 
   #scale_pattern_fill_manual(values = my_cols) + 
   scale_fill_manual(
   values = cols_interaction) + 
   facet_wrap(.~function.name,nrow=1) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
- # scale_x_discrete(labels = c("run away","no species","one-species","two-species")) +
+  scale_x_discrete(labels = c("competition",
+                              "one compete,\n one facilitate",
+                              "facilitation")) +
   theme_minimal() +
-  labs(y="Percentage of simulated community \nwith main sign of net interaction outcome", 
+  labs(y="Percentage of simulated communities", 
        fill="Community trajectory",
-       x="Primary interactions")+
+       x="")+
+       #x="Primary interactions of interacting species")+
        #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
-  guides(color="none") +
+  guides(color="none",
+         fill= guide_legend(override.aes = list(pattern = "none"),
+                            # position =c(.95, .95),
+                            direction="horizontal",
+                            byrow = TRUE,
+                            nrow = 1,
+                            title.hjust = 0.1)) +
   theme( legend.key.size = unit(1, 'cm'),
-         legend.position = "bottom",
+         legend.position = c(0.5,-0.3),
          strip.background = element_blank(),
          panel.spacing.x = unit(10, "mm"),
          panel.grid.minor = element_blank(),
          panel.grid.major.x = element_blank(),
-         strip.text = element_blank(),
-         legend.text=element_text(size=20),
-         legend.title=element_text(size=20),
-         #axis.ticks.x=element_blank(),
-         axis.text.x= element_text(size=24, angle=66, hjust=0.8),
-         axis.text.y= element_text(size=20),
-         axis.title.x= element_text(size=26),
-         axis.title.y= element_text(size=22),
-         plot.margin = unit(c(1,1,0,1), "cm"))
+         #strip.text = element_blank(),
+         strip.text = element_text(size=23), 
+         legend.text = element_text(size = 16, 
+                                    hjust = 0, 
+                                    vjust = 0.5),
+         legend.title = element_text(size = 18),
+         axis.title = element_text(size = 24),
+         axis.text.x= element_text(size=20,angle=76, vjust=0.73),
+        # axis.title.y= element_blank(),
+         axis.text.y= element_text(size = 23),
+        plot.margin = unit(c(1,0,0,1), "cm"))
+        # plot.margin = unit(c(1,1,0,2), "cm"))
 
 com.comp.plot.2
-com.comp.plot <- ggarrange(com.comp.plot.1,com.comp.plot.2,
+com.comp.plot <- ggarrange(com.comp.plot.1,
+                           com.comp.plot.2,
          nrow=2, common.legend=T, legend="none", labels = c("a.","b."),
          label.x = -0.5,
          label.y = 1,
@@ -197,7 +218,7 @@ com.comp.plot <- ggarrange(com.comp.plot.1,com.comp.plot.2,
                            color = "black", face = "bold",
                            family = NULL))
 
-
+library(ggpubr)
 com.comp.plot <- annotate_figure(com.comp.plot, 
                                  left = textGrob("Percentage of simulated community",
                                                  rot = 90, vjust = 2.5, hjust=0.3,
@@ -206,6 +227,60 @@ com.comp.plot <- annotate_figure(com.comp.plot,
 com.comp.plot 
 ggsave(com.comp.plot,
        file = "figures/com.comp.plot.pdf")
+# Poster
+
+com.comp.plot.2 <- df.min.abun.horyzontal %>%
+  mutate(function.name = case_when(function.int==1 ~"1.Traditional",
+                                   function.int==2 ~"2.Linear",
+                                   function.int==3 ~"3.Exp",
+                                   function.int==4 ~"4.Sigmoid")) %>%
+  filter(external_factor =="No external factor" &
+           Interspecific.interaction =="facilitation") %>%
+  aggregate(sim  ~ comp.com + function.name + Interspecific.interaction, length) %>%
+  mutate(sim = sim/500) %>%
+  ggplot(aes( fill= as.factor(comp.com),
+              y=sim,
+              x=as.factor(function.name))) +
+  geom_bar(stat="identity",color="black") +
+  #labels=c("run away population","no species","1-species","2-species")) +
+  #scale_color_manual(values = darken(cols_interaction, amount = .1)) + 
+  #scale_pattern_fill_manual(values = my_cols) + 
+  scale_fill_manual(
+    values = cols_interaction) + 
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  theme_minimal() +
+  labs(y="Percentage of simulated communities", 
+       fill="Community trajectory",
+       x="")+
+  #x="Primary interactions of interacting species")+
+  #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
+  guides(color="none",
+         fill= guide_legend(override.aes = list(pattern = "none"),
+                            # position =c(.95, .95),
+                            direction="horizontal",
+                            byrow = TRUE,
+                            nrow = 1,
+                            title.hjust = 0.1)) +
+  theme( legend.key.size = unit(1, 'cm'),
+         legend.position = "bottom",#c(0.5,-0.3),
+         strip.background = element_blank(),
+         panel.spacing.x = unit(10, "mm"),
+         panel.grid.minor = element_blank(),
+         panel.grid.major.x = element_blank(),
+         #strip.text = element_blank(),
+         strip.text = element_text(size=23), 
+         legend.text = element_text(size = 16, 
+                                    hjust = 0, 
+                                    vjust = 0.5),
+         legend.title = element_text(size = 18),
+         axis.title = element_text(size = 24),
+         axis.text.x= element_text(size=20,angle=76, vjust=0.73),
+         # axis.title.y= element_blank(),
+         axis.text.y= element_text(size = 23),
+         plot.margin = unit(c(1,0,0,1), "cm"))
+# plot.margin = unit(c(1,1,0,2), "cm"))
+
+com.comp.plot.2
 
 # ALL
 com.comp.plot.all <- df.min.abun.horyzontal %>%

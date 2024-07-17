@@ -297,9 +297,25 @@ df.stability.summary.small <- df.stability.summary.small  %>%
 
 #---- facet grid ----
 
+df.stability.prob <-  df.stability.summary.small %>%
+  filter(external_factor =="No external factor") %>%
+  mutate(stab.prob = case_when(stability.significance == "All species" & comp.com =="two-species community"~"2 stable species",
+                               stability.significance == "All species" & comp.com =="one-species community"~"1 stable species",
+                               stability.significance == "1 species out of 2" ~"1 stable species",
+                               stability.significance == "0 species" ~"0 species")) %>%
+  aggregate(sim ~ function.name + comp.com, length) %>%
+  mutate(sim = (sim/1500)) 
+  #aggregate(sim ~ stab.prob + significance + function.name + comp.com, length) %>%
+  #mutate(sim = (sim/1500)) 
+
 
 plot.stability.prob <-  df.stability.summary.small %>%
+  mutate(function.name = case_when(function.int==1 ~"1.Traditional",
+                                   function.int==2 ~"2.Linear",
+                                   function.int==3 ~"3.Exp",
+                                   function.int==4 ~"4.Sigmoid")) %>% 
   filter(external_factor =="No external factor") %>%
+  filter(comp.com == "two-species community") %>%
   mutate(stab.prob = case_when(stability.significance == "All species" & comp.com =="two-species community"~"2 stable species",
                                stability.significance == "All species" & comp.com =="one-species community"~"1 stable species",
                                stability.significance == "1 species out of 2" ~"1 stable species",
@@ -309,9 +325,8 @@ plot.stability.prob <-  df.stability.summary.small %>%
   ggplot() +
   geom_bar(aes(x=as.factor(stab.prob), y=sim, fill=significance ), color="black",
            stat="identity") + 
-  facet_wrap(.~function.name, 
-             nrow=1, strip.position= "top") +
-  scale_y_continuous("probability of detection\nfor a 1 or 2 species-community",
+  facet_wrap(.~function.name, nrow=1, strip.position= "top") +
+  scale_y_continuous("probability of detection in 2 species-communities",
                      labels = scales::percent_format(accuracy = 1)) +
   scale_x_discrete("", 
                    labels=c("no species\nstable","one species\nstable\n","two species\nstable\n"))+
@@ -320,22 +335,23 @@ plot.stability.prob <-  df.stability.summary.small %>%
                             "long & short\nsynchrony","sychrony &\noscilattion"),
                     values=  safe_colorblind_palette_4 ) +
   guides(fill= guide_legend(override.aes = list(pattern = "none"),
-                            direction="vertical",
+                           # position =c(.95, .95),
+                            direction="horizontal",
                             byrow = TRUE,
-                            nrow = 5,
+                            nrow = 1,
                             title.hjust = 0.1)) +
   theme_minimal() +
   theme(panel.spacing.x = unit(10, "mm"),
+        legend.position = c(0.5, -0.25),
         panel.grid.major.x  = element_blank(),
-        legend.position = "right",
         legend.text = element_text(size = 16, 
                                    hjust = 0, 
-                                   vjust = 0.5),
+                                   vjust = 0),
         legend.title = element_text(size = 18),
         legend.key.width = unit(5, "mm"),
         legend.key.height = unit(5, "mm"),
         axis.title = element_text(size = 24),
-        axis.text.x= element_text(size=24,angle=66, vjust=0.8),
+        axis.text.x= element_text(size=20,angle=76, vjust=0.73),
         axis.text.y= element_text(size=22),
         strip.background = element_blank(),
         strip.text = element_text(size=23), 
@@ -347,7 +363,62 @@ plot.stability.prob
 ggsave(plot.stability.prob, 
        file = "figures/plot.stability.prob.pdf")
 
+# poster
+plot.stability.prob <-  df.stability.summary.small %>%
+  mutate(function.name = case_when(function.int==1 ~"1.Traditional",
+                                   function.int==2 ~"2.Linear",
+                                   function.int==3 ~"3.Exp",
+                                   function.int==4 ~"4.Sigmoid")) %>% 
+  filter(external_factor =="No external factor") %>%
+  filter(comp.com == "two-species community") %>%
+  mutate(stab.prob = case_when(stability.significance == "All species" & comp.com =="two-species community"~"2 stable species",
+                               stability.significance == "All species" & comp.com =="one-species community"~"1 stable species",
+                               stability.significance == "1 species out of 2" ~"1 stable species",
+                               stability.significance == "0 species" ~"0 species")) %>%
+  aggregate(sim ~ significance + function.name, length) %>%
+  mutate(sim = (sim/1500)) %>%
+  ggplot() +
+  geom_bar(aes(x=function.name, #x=as.factor(stab.prob),
+               y=sim, fill=significance ), color="black",
+           stat="identity") + 
+  labs(x="") +
+  #facet_wrap(.~function.name, nrow=1, strip.position= "top") +
+  scale_y_continuous("probability of detection in 2 species-communities",
+                     labels = scales::percent_format(accuracy = 1)) +
+  scale_fill_manual("Community dynamics",
+                    labels=c("no detected dynamics",
+                             "short synchrony","long synchrony",
+                             "long & short synchrony",
+                             "sychrony & oscilattion"),
+                    values=  safe_colorblind_palette_4 ) +
+  guides(fill= guide_legend(override.aes = list(pattern = "none"),
+                            # position =c(.95, .95),
+                            direction="vertical",
+                            byrow = TRUE,
+                            nrow = 6,
+                            title.hjust = 0.1)) +
+  theme_minimal() +
+  theme(panel.spacing.x = unit(10, "mm"),
+        legend.box.background = element_rect(color="black", 
+                                             size=0.5),
+        legend.position = c(0.34, 0.9),
+        panel.grid.major.x  = element_blank(),
+        legend.text = element_text(size = 19, 
+                                   hjust = 0, 
+                                   vjust = 0),
+        legend.title = element_text(size = 20),
+        legend.key.width = unit(10, "mm"),
+        legend.key.height = unit(5, "mm"),
+        axis.title = element_text(size = 24),
+        axis.text.x= element_text(size=20,angle=76, vjust=0.73),
+        axis.text.y= element_text(size=22),
+        strip.background = element_blank(),
+        strip.text = element_text(size=23), 
+        strip.placement = "outside",
+        plot.margin = unit(c(1,0,-1,1), "cm")) 
+plot.stability.prob
 
+#all
 plot.stability.prob.all <-  df.stability.summary.small %>%
   mutate(stab.prob = case_when(stability.significance == "All species" & comp.com =="two-species community"~"2 stable species",
                                stability.significance == "All species" & comp.com =="one-species community"~"1 stable species",

@@ -286,20 +286,38 @@ sens_out$term <- factor(sens_out$term,
                             "N.opt.intra","N.opt.inter")
 )
         
-
+levels(sens_out$term)
 
 int_sensitivity_plot <- sens_out %>% 
   filter(term!="function") %>%
-  ggplot(aes(x = estimate, xmin = (estimate - std.error), xmax = (estimate + std.error),
+  ggplot(aes(x = estimate, xmin = (estimate - std.error), 
+             xmax = (estimate + std.error),
              color = as.factor(function.name), 
              fill = as.factor(function.name), y = as.factor(term))) +
   #geom_vline(xintercept = c(1:9+0.5), alpha = 0.5, color = "gray50", size = 0.2) +
   geom_bar(stat = "identity",width =0.6,
            position = position_dodge(), alpha = 0.7) +
-  geom_errorbar(position = position_dodge(), width = 0.6, show.legend = FALSE) +
+  geom_errorbar(position = position_dodge(), 
+                width = 0.6, show.legend = FALSE) +
   scale_color_manual(values = darken(my_cols, amount = .2)) + 
   scale_fill_manual(values = my_cols) +
+  scale_y_discrete(labels =c("base rate intra",
+                             "base rate inter",
+                             "shape intra","shape inter",
+                             "stretching C intra","stretching C inter",
+                             "neutral density intra","neutral density inter"
+                             )) +
   #scale_x_continuous(labes=("lowe"))
+  annotate('text', x = -0.5, y = 0.5, 
+           label = "less stable",size=7) +
+  annotate("segment", x = -0.57, y = 0.5, 
+           xend = -0.7, yend = 0.5,
+           arrow = arrow(type = "closed", length = unit(0.02, "npc"))) +
+  annotate('text', x = 0.5, y = 0.5, 
+           label = "more stable",size=7) +
+  annotate("segment", x = 0.57, y = 0.5, 
+           xend = 0.7, yend = 0.5,
+           arrow = arrow(type = "closed", length = unit(0.02, "npc"))) +
   theme_bw() +
   theme(panel.grid.major.y = element_blank(),
         panel.grid.minor.y = element_blank(),
@@ -317,7 +335,7 @@ int_sensitivity_plot <- sens_out %>%
         axis.title.x = element_text(size = 18)) +
   #facet_wrap(~comp, nrow = 2) +
   labs(title="Effect size of parameters for each function on the stability \nof one species in 2-species community",
-       y = "", x = "Effect Size on Stability of i \n ratio mean/var", fill = "", color = "") 
+       y = "", x = "Effect Size on Stability of one species \n ratio mean/var", fill = "", color = "") 
 
 int_sensitivity_plot
 ggsave("figures/sensitivity_analysis_stability_filter.pdf", 

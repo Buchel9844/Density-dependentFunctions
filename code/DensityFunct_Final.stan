@@ -4,11 +4,9 @@
 data{
   int<lower = 1> N;  // Number of plots/obs
   int<lower = 1> S;  // Number of species
-  int<lower = 1> U;  // Upper bound lambda
-  int<lower = 0> Nmax[S]; // density at max fecundity 
+  int<lower = 0> Nmedian[S];
   int Fecundity[N];  // Fecundity of the focal species in each plot
   matrix[N,S] SpMatrix;  // Matrix of abundances for each species (including abundances of non-focal individuals of the focal species)
-  int<lower = 0> Intra[S];  // Indicator boolean variable to identify the focal species (0 for non-focal and 1 for focal). Included for easier calculations
    int<lower = 0, upper = 1> run_estimation; // a switch to evaluate the likelihood
    int<lower = 0, upper = 1> alphaFunct1; // determine which tpe of function to run 
    int<lower = 0, upper = 1> alphaFunct2;// determine which tpe of function to run 
@@ -18,11 +16,13 @@ data{
 }
 
 parameters{
-  vector<lower=0,upper =1>[1] lambdas; // intrinsic growth rate - always positive
-  vector<lower=-0.5,upper =0.5>[S] c; //stretching parameters
+  vector<lower=0>[1] lambda; // intrinsic growth rate - always positive
+  vector<lower=0>[S] N_opt; // intrinsic growth rate - always positive
+
+  vector<lower=-1,upper =0>[S] c; //stretching parameters
 
   vector<lower=-1,upper =1>[S] alpha_initial; // initial effect of j on i - when Nj is minimal
-  vector<lower=-0.5,upper =0.5>[S] alpha_slope; // decay - impact of the addition of one individual of j, on the fecundity of i. 
+  vector<lower=-1,upper =0>[S] alpha_slope; // decay - impact of the addition of one individual of j, on the fecundity of i. 
 
     
   real<lower=0> disp_dev; // species-specific dispersion deviation parameter,
@@ -41,31 +41,29 @@ transformed parameters{
   matrix[N,S] alpha_function_eij;
   matrix[N,S] alpha_value;
   vector[N] lambda_ei;
-  vector[S] alpha_slope_ei;
-  vector[S] c_ei;
+  matrix[N,S] N_opt_ei;
   
   // implement the biological model
   for(i in 1:N){
-    lambda_ei[i] = U*lambdas[1];
+    lambda_ei[i] = lambda[1];
     for(s in 1:S){
+      N_opt_ei[i,s] = N_opt[s];
     //scaling factor
-    alpha_slope_ei[s] = alpha_slope[s] - 0.5; //scaling to have higher values
-    c_ei[s] = c[s] - 0.5;
       if(alphaFunct1 ==1){
       alpha_value[i,s]= alpha_initial[s];
       alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct2 ==1){
-       alpha_value[i,s] = alpha_initial[s] +  alpha_slope_ei[s]*(SpMatrix[i,s]-Nmax[s]);
-      alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
+       alpha_value[i,s] = alpha_initial[s] +  alpha_slope[s]*(SpMatrix[i,s]-N_opt_ei[i,s]);
+       alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct3 ==1){
-         alpha_value[i,s] = alpha_initial[s] + c_ei[s]*(1 - exp( alpha_slope_ei[s]*(SpMatrix[i,s]-Nmax[s])));
-      alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
+         alpha_value[i,s] = alpha_initial[s] + c[s]*(1 - exp( alpha_slope[s]*(SpMatrix[i,s]-N_opt_ei[i,s])));
+         alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct4 ==1){
-         alpha_value[i,s]= alpha_initial[s] + (c_ei[s]*(1 - exp( alpha_slope_ei[s]*(SpMatrix[i,s]-Nmax[s]))))/(1+exp( alpha_slope_ei[s]*(SpMatrix[i,s]-Nmax[s])));
-      alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
+         alpha_value[i,s]= alpha_initial[s] + (c[s]*(1 - exp( alpha_slope[s]*(SpMatrix[i,s]-N_opt_ei[i,s]))))/(1+exp( alpha_slope[s]*(SpMatrix[i,s]-N_opt_ei[i,s])));
+         alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
     }
     
@@ -79,11 +77,13 @@ model{
   // set regular priors
   alpha_initial ~ normal(0,1);
   alpha_slope ~ normal(0,1);
-  lambdas ~ normal(0,1);
+  lambda ~ normal(0,1);
+  for( s in 1:S){
+  N_opt[s] ~ normal(Nmedian[s],1);
+  }
   c ~ normal(0, 1);
   disp_dev ~ cauchy(0, 1);  // safer to place prior on disp_dev than on phi
   
-
  for(i in 1:N){
   Fecundity[i] ~ neg_binomial_2(F_hat[i],(disp_dev^2)^(-1)); 
    }

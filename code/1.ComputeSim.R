@@ -9,6 +9,7 @@ library(tidyverse)
 library(dplyr)
 library(ggpubr)
 library(ggplot2)
+library(ggplotify) 
 library(odeintr)
 library(brms)
 library(bbmle)
@@ -23,7 +24,7 @@ library(grid)
 ###########################################################################################################
 # 1. # 1. Compute Low- Density Growth Rates for wide range of parameters without coexistence restriction
 ##########################################################################################################
-source("code/PopProjection_toolbox.R")
+source("code/1.1.PopProjection_toolbox.R")
 # define parameters
 nsims <- 1500
 species <- 2
@@ -80,7 +81,7 @@ for( n in c(1:20000)){
                                   dimnames = list(c("i", "j"),
                                                   c("i", "j"))),
                     
-                    a_initial = matrix(ncol=species, nrow = species, # a_slope, only negative values
+                    a_initial = matrix(ncol=species, nrow = species, 
                                        data = rtruncnorm(n=species*species, mean= -0.1, sd=0.5, a=-1, b=1),
                                        dimnames = list(c("i", "j"),
                                                        c("i", "j"))),
@@ -183,7 +184,7 @@ for(i in 1:nsims){
 
 # save .csv
 df.sim <- df.sim %>%
-  mutate(function.name = case_when(function.int==1 ~"1.Constant",
+  mutate(function.name = case_when(function.int==1 ~"1.Traditional",
                                    function.int==2 ~"2.Linear",
                                    function.int==3 ~"3.Exp",
                                    function.int==4 ~"4.Sigmoid"),
@@ -261,9 +262,16 @@ comp <- df.sim$sim.i[which(df.sim$a_initial.i.j < -0.1 &
                df.sim$invader == "both")]
 
  fac <- df.sim$sim.i[which(df.sim$a_initial.i.j > 0 &
+                             df.sim$time == 1 &
+                             df.sim$function.int == 1 &
+                             df.sim$function.int == 1 &
+                             df.sim$external_factor == "No external factor" &
+                             df.sim$invader == "both")]
+ 
+ fac <- df.sim$sim.i[which(df.sim$a_initial.i.j > 0 &
                              df.sim$a_slope.i.j < - 0.15 &
                              df.sim$a_slope.i.j > - 0.3 &
-                             df.sim$c.j.i< -0.7 &
+                             df.sim$c.i.j< -0.7 &
                              df.sim$time == 1 &
                              df.sim$function.int == 1 &
                              df.sim$external_factor == "No external factor" &
@@ -289,13 +297,15 @@ fancy_scientific <- function(l){
   return(l)
 }
 comp
-fac
+fac  
 my_cols <- c("#AA4499", "#DDCC77","#88CCEE", "#44AA99")
 
 #584,156
-#290
+#280
+params[[490]]$a_initial
+{
 example.abundance.runawaysim.list <- list()
- for(n in  c(584,290)){
+ for(n in  c(490,28)){
    df.plot <- NULL
    df.alpha <-NULL
     for( fct.int in 1:4){
@@ -377,7 +387,7 @@ plot.abundance <- df.plot %>%
   ggplot(aes(x=time)) +
   geom_line(aes(y= log(abundance+1),color=function.name),size=3,alpha=0.8) +
   theme_bw() + 
-  labs(x="Time in years",y="Local abundance of\nfocal species(log10)", #y="",#
+  labs(x="Time in years",y="Local abundance of\nfocal species (log)", #y="",#
        color= "") +
   scale_color_manual(values=my_cols) +
   coord_cartesian(ylim=c(0,8)) +
@@ -407,8 +417,9 @@ plot.alpha <- df.alpha %>%
   scale_color_manual(values=my_cols) +
   labs(color="", y="Interspecific\nPer capita effect" ,#y="",#
        #title=n,
-       x="Neigbours heterospecific density") +
+       x="Neigbours density") +
   theme( legend.key.size = unit(2, 'cm'),
+         legend.position = "bottom",
          strip.text = element_text(size=20),
          strip.background = element_blank(),
          panel.grid.major.x = element_blank(),
@@ -420,10 +431,14 @@ plot.alpha <- df.alpha %>%
          #axis.title.y= element_text(size=16),
          title=element_text(size=25))
 
+
+plot.legend <- get_legend(plot.alpha)
+  
 if(length(example.abundance.runawaysim.list) ==0){
-  example.abundance.runawaysim.list[[paste0("plot",n)]]  <- ggarrange(plot.alpha,plot.abundance,
-                                                                      ncol=2,nrow=1,
-                                                                      common.legend = FALSE,
+  example.abundance.runawaysim.list[[paste0("plot",n)]]  <- ggarrange(plot.alpha,ggplot() + theme_void(),plot.abundance,
+                                                                      ncol=3,nrow=1,
+                                                                      widths = c(1,0.1,1),
+                                                                      common.legend = T,
                                                                       legend="none")
 }
 if(length(example.abundance.runawaysim.list) ==1){
@@ -431,36 +446,40 @@ if(length(example.abundance.runawaysim.list) ==1){
   
 }
 if(length(example.abundance.runawaysim.list) >= 2){
-  example.abundance.runawaysim.list[[paste0("plot",n)]]  <- ggarrange(plot.alpha,plot.abundance,
-                                                     ncol=2,nrow=1,
+  example.abundance.runawaysim.list[[paste0("plot",n)]]  <- ggarrange(plot.alpha,ggplot() + theme_void(),plot.abundance,
+                                                     ncol=3,nrow=1,
+                                                     widths =c(1,0.1,1),
                                                      common.legend = T,
-                                                     legend="bottom")
+                                                     legend="none")
 
  }
  }
 
-example.abundance.runawaysim.list 
+  
+example.abundance.runawaysim.list[["legend"]] <- ggplotify::as.ggplot(plot.legend)
+example.abundance.runawaysim.list$plot490
 length(example.abundance.runawaysim.list)
 #######Graph A&B##################
 
-
- example.abundance.runawaysim <-  ggpubr::ggarrange(plotlist = example.abundance.runawaysim.list, 
-                                           nrow=3, ncol=1,
-                                           heights = c(1,0.1,1.2),
-                                          labels=c("a. Governing interaction is facilitative", 
+example.abundance.runawaysim <-  ggpubr::ggarrange(plotlist = example.abundance.runawaysim.list, 
+                                           nrow=4, ncol=1,
+                                           heights = c(1,0.2,1,0.2),
+                                          labels=c("a. Predominant interaction is facilitative", 
                                                    "",
-                                                   "b. Governing interaction is competitive"),
+                                                   "b. Predominant interaction is competitive",
+                                                   ""),
                             align = "v",
-                            hjust= -0.18,
+                            hjust= 0,
                             vjust = -0.5,    
-                            font.label = list(size = 22, color = "black", 
+                            font.label = list(size = 28, color = "black", 
                                               face = "bold", family = NULL, position = "top"),
-                           common.legend = F, legend="none") +
-  theme(plot.margin = margin(1,1,1,1, "cm"))  
+                           common.legend = T, legend="bottom") +
+  theme(plot.margin = margin(1.3,1,0,1, "cm"))  
  example.abundance.runawaysim
+}
 library(grid)
  
-example.abundance.runawaysim <- annotate_figure(example.abundance.runawaysim, left = textGrob("Local abundance (log10)", 
+example.abundance.runawaysim <- annotate_figure(example.abundance.runawaysim, left = textGrob("Local abundance (log)", 
                                                                 rot = 90, vjust = 3, 
                                                                 gp = gpar(fontsize=18,cex = 1.3)),
                                                 right = textGrob("Facilitation", 
