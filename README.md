@@ -1,9 +1,8 @@
 Project to modify pairwise interaction effect to be a function of neighbourhood density. 
 Lisa Buche - June 2023
 
-A Rmarkdown is available to understand the story in Summary. Rmd
-
-A shiny App is available to display the 4 different functions of neighbourhood density-dependency. To play with the shiny app - run the "shiny/functions.R" code in a Rstudio session. 
+A shiny App is available to display the 4 different functions of neighbourhood density-dependency. To play with the shiny app - run the "shiny/functions.R" code in a Rstudio session. Or open the webpage:
+https://lisa-buche.shinyapps.io/shiny/
 
 Here is the Rscripts list and what they do.
 Code to generate simulated 2 species communities:
