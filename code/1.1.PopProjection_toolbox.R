@@ -182,15 +182,12 @@ Ricker_solution_mono <- function(gens,
 
 Ricker_solution_NatData <- function(gens,
                                     state,
-                                    pars) {
+                                    pars,
+                                    scalewidth,
+                                    neigh.vec) {
   function.int <- pars$function.int[1]
-  Nmax <- pars$Nmax # density at which fecundity is max - effect of neighbors is 0
   g <- pars$g[1] # germination rate 
   s <- pars$s[1] #seed survival
-  lambda <- pars$lambda[1] # intrinsic growth rate
-  a_initial <- pars$alpha_init # which int.function
-  a_slope <- pars$alpha_slope # which int.function
-  c <- pars$alpha_c # which int.function
    
   df <- state
   
@@ -198,23 +195,32 @@ Ricker_solution_NatData <- function(gens,
     Nt1 <- c()
     Fec <- c()
     Nt <-  df[t,]  # species i densities
+    Interaction_effect <- c()
+    for(n in neigh.vec){
+      Nmax <- pars$Nmax[which(pars$neigh==n)] # density at which fecundity is max - effect of neighbors is 0
+      a_initial <- pars$alpha_init[which(pars$neigh==n)] # which int.function
+      a_slope <- pars$alpha_slope[which(pars$neigh==n)]  # which int.function
+      c <- pars$alpha_c[which(pars$neigh==n)]  # which int.function
+      
     if(function.int==1){
         a <- a_initial
       }
       if(function.int==2){
-        a <- alpha_function2(a_initial, a_slope,g*Nt, Nmax)
+        a <- alpha_function2(a_initial, a_slope,Nt[n], Nmax)
       }
       if(function.int==3){
-        a <- alpha_function3(a_initial, a_slope,c,g*Nt, Nmax)
+        a <- alpha_function3(a_initial, a_slope,c,Nt[n], Nmax)
       }
       if(function.int==4){
-        a <- alpha_function4(a_initial, a_slope,c,g*Nt, Nmax)
+        a <- alpha_function4(a_initial, a_slope,c,Nt[n], Nmax)
       }
       
-      Fec <- exp(lambda + sum(a*g*Nt))
-      
-      Nt1 <- ((1-g) * s + g* Fec)*Nt$conspecific
-      df$conspecific[t+1] <- c(Nt1)
+      Interaction_effect[which(neigh.vec==n)] <- as.numeric(a*Nt[n])
+    }
+      Fec = exp(lambda + sum(Interaction_effect))
+      Nt1 <- (1-g)*s*Nt$seed.total.conspecific + Fec*Nt$seed.total.conspecific*g
+      df$seed.total.conspecific[t+1] <- Nt1
+      df$conspecific[t+1] <- Nt1*g
     }
     
   df$time <- c(1:gens) 
