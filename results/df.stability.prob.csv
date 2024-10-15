@@ -1,0 +1,13 @@
+"","functional form","Stability","no detected dynamics","Short synchrony","Long synchrony","Long and short synchrony","Synchronous Oscillation","Total"
+"1","Traditional constant","0 species",0.6,0.07,0.53,0.07,1.13,2.4
+"2","Traditional constant","1 stable species",0.67,0,0.53,0,0.33,1.53
+"3","Traditional constant","2 stable species",21.07,0,0.2,0,0,21.27
+"4","Linear","0 species",3,0.07,0.13,1.8,0.53,5.53
+"5","Linear","1 stable species",2.27,0,0,0.13,0.47,2.87
+"6","Linear","2 stable species",5.8,0.13,0,0,0.47,6.4
+"7","Exp","0 species",2.73,0.27,0.4,2.8,1.2,7.4
+"8","Exp","1 stable species",2.8,0.07,0.07,0.53,1.2,4.67
+"9","Exp","2 stable species",9.2,0.13,0.07,0.07,0.53,10
+"10","Sigmoid","0 species",6.53,0.47,2,8.33,7.4,24.73
+"11","Sigmoid","1 stable species",6.67,0.13,0.13,0.47,3.4,10.8
+"12","Sigmoid","2 stable species",17.73,0.07,0.27,0.87,2.67,21.61

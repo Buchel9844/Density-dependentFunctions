@@ -1,0 +1,17 @@
+"","functional form","Community dynamics","Competition","One competiting,one facilitating","Facilitation","Total"
+"1","Traditional constant","run away population",0.07,0.54,25.59,26.2
+"2","Traditional constant","no species",0,0.13,0,0.13
+"3","Traditional constant","one-species community",28.41,19.9,0.54,48.85
+"4","Traditional constant","two-species community",5.03,12.93,7.37,25.33
+"5","Linear","run away population",0.47,0.27,0.2,0.94
+"6","Linear","no species",21.64,25.59,26.53,73.76
+"7","Linear","one-species community",5.23,3.15,2.55,10.93
+"8","Linear","two-species community",6.16,4.49,4.22,14.87
+"9","Exp","run away population",0.67,3.48,9.98,14.13
+"10","Exp","no species",18.36,17.29,14.07,49.72
+"11","Exp","one-species community",7.91,5.03,1.54,14.48
+"12","Exp","two-species community",6.57,7.7,7.91,22.18
+"13","Sigmoid","run away population",0.07,0.6,5.03,5.7
+"14","Sigmoid","no species",0.13,2.21,4.42,6.76
+"15","Sigmoid","one-species community",16.95,11.32,2.34,30.61
+"16","Sigmoid","two-species community",16.35,19.36,21.71,57.42
