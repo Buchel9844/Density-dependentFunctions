@@ -1,0 +1,10 @@
+name: shiny
+title:
+username: lisa-buche
+account: lisa-buche
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 12308363
+bundleId: 8854406
+url: https://lisa-buche.shinyapps.io/shiny/
+version: 1
