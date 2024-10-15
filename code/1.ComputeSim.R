@@ -169,7 +169,7 @@ for(i in 1:nsims){
     #    add_external_factor) %>%# simulation of invasion for both species
     #  bind_cols(df.n) 
    
-    df.initc <- Ricker_solution(state = c(5,5), pars= p, gens=t.num,
+    df.initc <- Ricker_solution_withalpha(state = c(5,5), pars= p, gens=t.num,
                         function.int,add_external_factor) %>% # simulation of initial condition = 1,1
       mutate(invader = "both") %>%
       bind_cols(df.n) %>% 
@@ -215,7 +215,7 @@ t.num= 100
 
 #---- Abundance through time with external factors----
   
-example.abundance.external.fact <- df.sim[which(df.sim$sim.i == 370 &
+example.abundance.external.fact <- df.sim[which(df.sim$sim.i ==500 &
                                                 df.sim$time < 100 &
                                                 df.sim$invader == "both"),] %>%
   gather(Ni, Nj, key=species, value=abundance) %>%
@@ -360,7 +360,7 @@ example.abundance.runawaysim.list <- list()
         
       }
 
-   df.plot <- df.plot %>% mutate(function.name = case_when(function.int==1 ~"1.Constant",
+   df.plot <- df.plot %>% mutate(function.name = case_when(function.int==1 ~"Constant",
                                     function.int==2 ~"2.Linear",
                                     function.int==3 ~"3.Exp",
                                     function.int==4 ~"4.Sigmoid"))
@@ -389,7 +389,10 @@ plot.abundance <- df.plot %>%
   theme_bw() + 
   labs(x="Time in years",y="Local abundance of\nfocal species (log)", #y="",#
        color= "") +
-  scale_color_manual(values=my_cols) +
+  scale_color_manual(values=my_cols, labels=c("Traditional\nconstant",
+                                              "Linear",
+                                              "Exponential",
+                                              "Sigmoid")) +
   coord_cartesian(ylim=c(0,8)) +
   #guides(color="none") +
   theme( legend.key.size = unit(2, 'cm'),
@@ -414,7 +417,10 @@ plot.alpha <- df.alpha %>%
   coord_cartesian(ylim=c(-1.5,1.5)) +
   geom_label(x=16,y=1.35,label="Facilitation",size=8) +
   geom_label(x=16,y=-1.35,label="Competition",size=8) +
-  scale_color_manual(values=my_cols) +
+  scale_color_manual(values=my_cols,labels=c("Traditional\nconstant",
+                                            "Linear",
+                                            "Exponential",
+                                            "Sigmoid")) +
   labs(color="", y="Interspecific\nPer capita effect" ,#y="",#
        #title=n,
        x="Neigbours density") +
@@ -479,14 +485,14 @@ example.abundance.runawaysim <-  ggpubr::ggarrange(plotlist = example.abundance.
 }
 library(grid)
  
-example.abundance.runawaysim <- annotate_figure(example.abundance.runawaysim, left = textGrob("Local abundance (log)", 
-                                                                rot = 90, vjust = 3, 
-                                                                gp = gpar(fontsize=18,cex = 1.3)),
-                                                right = textGrob("Facilitation", 
+example.abundance.runawaysim <- annotate_figure(#example.abundance.runawaysim, left = textGrob("Local abundance (log)", 
+                                                  #              rot = 90, vjust = 3, 
+                                                  #              gp = gpar(fontsize=18,cex = 1.3)),
+                                              #  right = textGrob("Facilitation", 
                                                                 # check.overlap = T,
-                                                                 rot=90,
-                                                                vjust = -8, hjust = 0.25,
-                                                                gp = gpar(fontsize=18,cex = 1.3)),
+                                                  #               rot=90,
+                                                   #             vjust = -8, hjust = 0.25,
+                                                     #           gp = gpar(fontsize=18,cex = 1.3)),
                                   bottom = textGrob("Time in years",vjust=-2, 
                                                     gp = gpar(fontsize=18,cex = 1.3))) +
   theme(plot.margin=grid::unit(c(0,-10,-10,-10), "mm"))

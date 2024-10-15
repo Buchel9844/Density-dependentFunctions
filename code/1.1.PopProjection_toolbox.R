@@ -51,8 +51,8 @@ Ricker_solution_withalpha <- function(gens,
   }
   for(t in 1:gens){
     
-    Ni <- df[t,"Ni"] # species i densities
-    Nj <- df[t,"Nj"] # species j  densities
+    Ni <- df[t,"Ni"] # species i seed densities
+    Nj <- df[t,"Nj"] # species j  seed densities
     
     if(function.int==1){
       aii <- a_initial[1,1]
@@ -188,9 +188,9 @@ Ricker_solution_NatData <- function(gens,
   function.int <- pars$function.int[1]
   g <- pars$g[1] # germination rate 
   s <- pars$s[1] #seed survival
-   
+  lambda <- pars$lambda[1] # intrinsic growth rate
   df <- state
-  
+
   for(t in 1:(gens-1)){
     Nt1 <- c()
     Fec <- c()
@@ -223,7 +223,6 @@ Ricker_solution_NatData <- function(gens,
       df$conspecific[t+1] <- Nt1*g
     }
     
-  df$time <- c(1:gens) 
   return(df)
 }
 # function modified from https://github.com/laurenmh/avena-erodium/blob/master/invader_resident_comparison.R

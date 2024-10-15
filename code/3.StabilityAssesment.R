@@ -12,7 +12,7 @@ library(broom)
 ##########################################################################################################
 # Stability metric
 ##########################################################################################################
- source("code/TimeSerie_toolbox.R")
+ source("code/3.1.TimeSerie_toolbox.R")
 df.stability <- as.data.frame(df.sim.comcomp[which(df.sim.comcomp$invader =="both"),])
  summary.df.stability <- NULL
  nsims <- 1500
@@ -272,9 +272,12 @@ df.stability.summary.small <- df.stability.summary.small %>%
   mutate(significance = factor(significance, 
                                levels=c("no detected dynamics","Short synchrony","Long synchrony","Long and short synchrony","Synchronous Oscillation")))
 
+df.stability.summary.small  %>% count(function.int, significance)
+
 levels(as.factor(df.stability.summary.small$significance))
 levels(as.factor(df.stability.summary.small$stability.significance))
 levels(as.factor(df.stability$external_factor))
+levels(as.factor(df.stability$function.name))
 df.stability.summary.small[which(is.na(df.stability.summary.small$significance)),]
 
 my_cols <- c("#AA4499", "#DDCC77","#88CCEE", "#44AA99")
@@ -289,31 +292,63 @@ safe_colorblind_palette_4 <-c("lightgrey","#6699CC","#332288","#117733","#DDCC77
 #scales::show_col(safe_colorblind_palette)
 
 df.stability.summary.small <- df.stability.summary.small  %>%
-  mutate(function.name = case_when(function.int==1 ~"1.Constant",
+  mutate(function.name = case_when(function.int==1 ~"1.Traditional constant",
                                    function.int==2 ~"2.Linear",
                                    function.int==3 ~"3.Exp",
                                    function.int==4 ~"4.Sigmoid"))
 
-
+levels(as.factor(df.stability$function.int))
 #---- facet grid ----
+df.coexistence.prob <-  df.stability %>%
+  filter(external_factor =="No external factor") %>%
+  mutate(function.name = case_when(function.int==1 ~"Traditional constant",
+                                   function.int==2 ~"Linear",
+                                   function.int==3 ~"Exp",
+                                   function.int==4 ~"Sigmoid")) %>%
+  mutate(function.name  = factor(function.name,
+                                 levels=c("Traditional constant","Linear","Exp","Sigmoid"))) %>%
+  aggregate(sim ~ function.name + comp.com + Interspecific.interaction, length) %>%
+  mutate(sim = round((sim/(1500*100*2))*100,digits=2)) %>%
+  spread(Interspecific.interaction,sim) %>%
+  replace(is.na(.),0) %>%
+  mutate(Total = rowSums(.[,levels(as.factor(df.stability.summary.small$Interspecific.interaction))],na.rm=T))
+df.coexistence.prob
+names(df.coexistence.prob) <- c("functional form","Community dynamics",
+                                   "Competition","One competing,one facilitating",
+                                   "Facilitation","Total")
+write.csv(df.coexistence.prob ,
+          "results/df.coexistence.prob.csv")
 
 df.stability.prob <-  df.stability.summary.small %>%
   filter(external_factor =="No external factor") %>%
+  filter(comp.com == "two-species community") %>%
+  mutate(function.name = case_when(function.int==1 ~"Traditional constant",
+                                   function.int==2 ~"Linear",
+                                   function.int==3 ~"Exp",
+                                   function.int==4 ~"Sigmoid")) %>%
+  mutate(function.name  = factor(function.name,
+                                 levels=c("Traditional constant","Linear","Exp","Sigmoid"))) %>%
   mutate(stab.prob = case_when(stability.significance == "All species" & comp.com =="two-species community"~"2 stable species",
                                stability.significance == "All species" & comp.com =="one-species community"~"1 stable species",
                                stability.significance == "1 species out of 2" ~"1 stable species",
                                stability.significance == "0 species" ~"0 species")) %>%
-  aggregate(sim ~ function.name + comp.com, length) %>%
-  mutate(sim = (sim/1500)) 
-  #aggregate(sim ~ stab.prob + significance + function.name + comp.com, length) %>%
-  #mutate(sim = (sim/1500)) 
-
+  aggregate(sim ~ function.name + stab.prob + significance,length) %>%
+  mutate(sim = round((sim/1500)*100,digits=2))%>%
+  spread(significance,sim) %>%
+  replace(is.na(.),0) %>%
+  mutate(Total = rowSums(.[,levels(as.factor(df.stability.summary.small$significance))],na.rm=T))
+df.stability.prob
+names(df.stability.prob)[1:2] <- c("functional form","Stability")
+write.csv(df.stability.prob,
+          "results/df.stability.prob.csv")
 
 plot.stability.prob <-  df.stability.summary.small %>%
-  mutate(function.name = case_when(function.int==1 ~"1.Traditional",
-                                   function.int==2 ~"2.Linear",
-                                   function.int==3 ~"3.Exp",
-                                   function.int==4 ~"4.Sigmoid")) %>% 
+  mutate(function.name = case_when(function.int==1 ~"a - Traditional constant",
+                                   function.int==2 ~"b - Linear",
+                                   function.int==3 ~"c - Exp",
+                                   function.int==4 ~"d - Sigmoid")) %>%
+  mutate(function.name  = factor(function.name,
+                                 levels=c("a - Traditional constant","b - Linear","c - Exp","d - Sigmoid"))) %>%
   filter(external_factor =="No external factor") %>%
   filter(comp.com == "two-species community") %>%
   mutate(stab.prob = case_when(stability.significance == "All species" & comp.com =="two-species community"~"2 stable species",
@@ -344,19 +379,19 @@ plot.stability.prob <-  df.stability.summary.small %>%
   theme(panel.spacing.x = unit(10, "mm"),
         legend.position = c(0.5, -0.25),
         panel.grid.major.x  = element_blank(),
-        legend.text = element_text(size = 16, 
+        legend.text = element_text(size = 23, 
                                    hjust = 0, 
                                    vjust = 0),
         legend.title = element_text(size = 18),
         legend.key.width = unit(5, "mm"),
         legend.key.height = unit(5, "mm"),
         axis.title = element_text(size = 24),
-        axis.text.x= element_text(size=20,angle=76, vjust=0.73),
+        axis.text.x= element_text(size=22,angle=76, vjust=0.73),
         axis.text.y= element_text(size=22),
         strip.background = element_blank(),
         strip.text = element_text(size=23), 
         strip.placement = "outside",
-        plot.margin = unit(c(1,0,0,1), "cm")) 
+        plot.margin = unit(c(1,1,1,1), "cm")) 
 plot.stability.prob
 
 

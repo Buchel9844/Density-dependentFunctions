@@ -6,7 +6,7 @@ library(ggpubr)
 ##########################################################################################################
 df.sim <- as.data.frame(df.sim)
 df.min.abundance <- NULL
-nsims <- 
+
 for(i in 1:nsims){
   for( function.int in 1:4){
     for(add_external_factor in c("No external factor","Noisy change","Periodic change")){
@@ -48,7 +48,7 @@ for(i in 1:nsims){
 }
 
 df.min.abundance  <- df.min.abundance  %>%
-  mutate(function.name = case_when(function.int==1 ~"1.Constant",
+  mutate(function.name = case_when(function.int==1 ~"1.Traditional",
                                    function.int==2 ~"2.Linear",
                                    function.int==3 ~"3.Exp",
                                    function.int==4 ~"4.Sigmoid")) %>%
@@ -108,10 +108,12 @@ safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#33228
 
 df.min.abun.horyzontal$comp.com
 com.comp.plot.1 <- df.min.abun.horyzontal %>%
-  mutate(function.name = case_when(function.int==1 ~"1.Traditional",
-                                   function.int==2 ~"2.Linear",
-                                   function.int==3 ~"3.Exp",
-                                   function.int==4 ~"4.Sigmoid")) %>%
+  mutate(function.name = case_when(function.int==1 ~"a - Traditional constant",
+                                   function.int==2 ~"b - Linear",
+                                   function.int==3 ~"c - Exp",
+                                   function.int==4 ~"d - Sigmoid")) %>%
+  mutate(function.name  = factor(function.name,
+                                 levels=c("a - Traditional constant","b - Linear","c - Exp","d - Sigmoid"))) %>%
   filter(external_factor =="No external factor" ) %>%
   aggregate(sim  ~ comp.com + function.name, length) %>%
   mutate(sim = sim/1500) %>%
@@ -127,7 +129,8 @@ com.comp.plot.1 <- df.min.abun.horyzontal %>%
     values = cols_interaction) + 
   facet_wrap(.~function.name,nrow=1) +
   theme_minimal() +
-  labs(y="Percentage of \n simulated communities", fill="Community trajectory",
+  labs(y="",
+       fill="Community trajectory",
        x="")+
   #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
   guides(color="none") +
@@ -147,18 +150,21 @@ com.comp.plot.1 <- df.min.abun.horyzontal %>%
                                     vjust = 0.5),
          legend.title = element_text(size = 18),
          axis.title = element_text(size = 24),
-         axis.text.x= element_text(size=20,angle=76, vjust=0.73),
+         axis.text.x= element_text(size=22,angle=76, vjust=0.73),
          axis.text.y= element_text(size=22),
-         axis.title.y= element_blank(),
-         strip.text = element_text(size=23), 
-         plot.margin = unit(c(1,1,0,2), "cm"))
+         axis.title.y= element_text(size=22),
+         strip.text = element_text(size=24), 
+         plot.margin = unit(c(1,1,-2,2), "cm"))
 com.comp.plot.1 
 
 com.comp.plot.2 <- df.min.abun.horyzontal %>%
-  mutate(function.name = case_when(function.int==1 ~"1.Traditional",
-                                   function.int==2 ~"2.Linear",
-                                   function.int==3 ~"3.Exp",
-                                   function.int==4 ~"4.Sigmoid")) %>%
+  mutate(function.name = case_when(function.int==1 ~"Traditional\nconstant",
+                                   function.int==2 ~"Linear",
+                                   function.int==3 ~"Exp",
+                                   function.int==4 ~"Sigmoid")) %>%
+  mutate(function.name  = factor(function.name,
+                                 levels=c("Traditional\nconstant","Linear","Exp","Sigmoid"))) %>%
+  filter(external_factor =="No external factor" ) %>%
   filter(external_factor =="No external factor" ) %>%
   aggregate(sim  ~ comp.com + function.name + Interspecific.interaction, length) %>%
   mutate(sim = sim/500) %>%
@@ -177,7 +183,7 @@ com.comp.plot.2 <- df.min.abun.horyzontal %>%
                               "one compete,\n one facilitate",
                               "facilitation")) +
   theme_minimal() +
-  labs(y="Percentage of simulated communities", 
+  labs(y="", 
        fill="Community trajectory",
        x="")+
        #x="Primary interactions of interacting species")+
@@ -195,18 +201,18 @@ com.comp.plot.2 <- df.min.abun.horyzontal %>%
          panel.spacing.x = unit(10, "mm"),
          panel.grid.minor = element_blank(),
          panel.grid.major.x = element_blank(),
-         #strip.text = element_blank(),
-         strip.text = element_text(size=23), 
+         strip.text = element_blank(),
+         #strip.text = element_text(size=23), 
          legend.text = element_text(size = 16, 
                                     hjust = 0, 
                                     vjust = 0.5),
          legend.title = element_text(size = 18),
          axis.title = element_text(size = 24),
-         axis.text.x= element_text(size=20,angle=76, vjust=0.73),
+         axis.text.x= element_text(size=22,angle=76, vjust=0.73),
         # axis.title.y= element_blank(),
          axis.text.y= element_text(size = 23),
-        plot.margin = unit(c(1,0,0,1), "cm"))
-        # plot.margin = unit(c(1,1,0,2), "cm"))
+        #plot.margin = unit(c(1,0,0,1), "cm"))
+         plot.margin = unit(c(1,1,0,2), "cm"))
 
 com.comp.plot.2
 com.comp.plot <- ggarrange(com.comp.plot.1,
@@ -220,9 +226,9 @@ com.comp.plot <- ggarrange(com.comp.plot.1,
 
 library(ggpubr)
 com.comp.plot <- annotate_figure(com.comp.plot, 
-                                 left = textGrob("Percentage of simulated community",
-                                                 rot = 90, vjust = 2.5, hjust=0.3,
-                                                 gp = gpar(fontsize=18,cex = 1.3))) +
+                                 left = textGrob("Percentage of runs",
+                                                 rot = 90, vjust = 3, hjust=0.3,
+                                                 gp = gpar(fontsize=21,cex = 1.3))) +
   theme(plot.margin=grid::unit(c(0,-10,-10,-10), "mm"))
 com.comp.plot 
 ggsave(com.comp.plot,
@@ -328,11 +334,12 @@ ggsave(com.comp.plot.all,
 df.sim$sim <- df.sim$sim.i
 df.sim.comcomp <- left_join(df.sim,
                             df.min.abun.horyzontal,
-                            by=c("function.int","sim","external_factor","function.name"))
-
-
+                            by=c("function.int","sim","external_factor","function.name"),
+                            relationship="many-to-many")
+head(df.sim.comcomp)
+view( df.min.abun.horyzontal)
 ##########################################################################################################
-# 2. minimum  population  size
+# 2. NOT INCLUDED -- minimum  population  size
 ##########################################################################################################
 min.exp.abun <- function(dN,Time,n){ 
   # Time is the time given to reach a particular threshold n
@@ -404,7 +411,7 @@ write.csv(df.min.exp.abun ,
           file = paste0("results/df.min.exp.abun.csv.gz"))
 
 ##########################################################################################################
-# 3. Compute slopes of growth over time
+# 3. NOT INCLUDED -- Compute slopes of growth over time
 ##########################################################################################################
 
 load("results/df.sim.csv.gz")
