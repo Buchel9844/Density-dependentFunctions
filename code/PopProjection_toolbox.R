@@ -51,9 +51,9 @@ Ricker_solution_withalpha <- function(gens,
   }
   for(t in 1:gens){
     
-    Ni <- df[t,"Ni"] # species i densities
-    Nj <- df[t,"Nj"] # species j  densities
-    
+    Ni <- df[t,"Ni"] # species i seed densities
+    Nj <- df[t,"Nj"] # species j  seed densities
+
     if(function.int==1){
       aii <- a_initial[1,1]
       aij <- a_initial[1,2]
@@ -90,86 +90,18 @@ Ricker_solution_withalpha <- function(gens,
     
     df[t,4:5] <- c(Nidt, Njdt)
     df[t,6:9] <- c(aii,ajj,aij,aji)
+    df[t,10:11] <- c(Fi,Fj)
     df[t+1,2:3] <- c(Nit1, Njt1)
+    
   }
-  df[c(1:length(e)),10] <- c(e)
-  names(df) <- c("time","Ni","Nj","dNi","dNj","aii","ajj","aij","aji","external.fact")
+  df[c(1:length(e)),12] <- c(e)
+  names(df) <- c("time","Ni","Nj","dNi","dNj",
+                 "aii","ajj","aij","aji","Fi","Fj","external.fact")
+  df$Stem_i <- df$Ni*g[1]
+  df$Stem_j <- df$Nj*g[2]
   return(df)
 }
 
-
-Ricker_solution <- function(gens,
-                                state,
-                                pars,
-                           function.int,
-                           add_external_factor) {
-  Nmax <- pars$Nmax # density at which fecundity is max - effect of neighbors is 0
-  g <- pars$g # germination rate 
-  s <- pars$s #seed survival
-  lambda <- pars$lambda # intrinsic growth rate
-  a_initial <- pars$a_initial # which int.function
-  a_slope <- pars$a_slope # which int.function
-  c <- pars$c # which int.function
-  
-  df <- data.frame( t=0:gens,  Ni=numeric(1+gens),  Nj =numeric(1+gens) ,
-                    dNi=numeric(1+gens),  dNj =numeric(1+gens) )
-  df[1,2:3] <- c(state[1],state[2]) #species i initial densities
-  
-  if(add_external_factor =="none"){
-    e <- rep(0,times=gens)
-  }
-  if(add_external_factor =="season"){
-    e <- pars$e_seasonal
-  }
-  if(add_external_factor =="noise"){
-    e <- pars$e_noise
-  }
-  for(t in 1:gens){
-    
-    Ni <- df[t,"Ni"] # species i densities
-    Nj <- df[t,"Nj"] # species j  densities
-    
-    if(function.int==1){
-      aii <- a_initial[1,1]
-      aij <- a_initial[1,2]
-      aji <- a_initial[2,1]
-      ajj <- a_initial[2,2]
-    }
-    if(function.int==2){
-      aii <- alpha_function2(a_initial[1,1], a_slope[1,1],g[1]*Ni, Nmax[1,1])
-      aij <- alpha_function2(a_initial[1,2], a_slope[1,2],g[2]*Nj, Nmax[1,2])
-      aji <- alpha_function2(a_initial[2,1], a_slope[2,1],g[1]*Ni, Nmax[2,1])
-      ajj <- alpha_function2(a_initial[2,2], a_slope[2,2],g[2]*Nj, Nmax[2,2])
-    }
-    if(function.int==3){
-      aii <- alpha_function3(a_initial[1,1], a_slope[1,1],c[1,1],g[1]*Ni, Nmax[1])
-      aij <- alpha_function3(a_initial[1,2], a_slope[1,2],c[1,2],g[2]*Nj, Nmax[2])
-      aji <- alpha_function3(a_initial[2,1], a_slope[2,1],c[2,1],g[1]*Ni, Nmax[1])
-      ajj <- alpha_function3(a_initial[2,2], a_slope[2,2],c[2,2],g[2]*Nj, Nmax[2])
-    }
-    if(function.int==4){
-      aii <- alpha_function4(a_initial[1,1], a_slope[1,1],c[1,1],g[1]*Ni, Nmax[1])
-      aij <- alpha_function4(a_initial[1,2], a_slope[1,2],c[1,2],g[2]*Nj, Nmax[2])
-      aji <- alpha_function4(a_initial[2,1], a_slope[2,1],c[2,1],g[1]*Ni, Nmax[1])
-      ajj <- alpha_function4(a_initial[2,2], a_slope[2,2],c[2,2],g[2]*Nj, Nmax[2])
-    }
-
-    
-    Fi <-  exp(lambda[1] + aii * g[1]*Ni + aij *g[2]*Nj + e[t])
-    Fj <-  exp(lambda[2] + ajj * g[2]*Nj + aji *g[1]*Ni + e[t])
-    
-    Nit1 <- ((1-g[1]) * s[1] + g[1] * Fi)*Ni 
-    Njt1 <- ((1-g[2]) * s[2] + g[2] * Fj)*Nj
-    Nidt <- Nit1/Ni
-    Njdt <- Njt1/Nj
-    
-    df[t,4:5] <- c(Nidt, Njdt)
-    df[t+1,2:3] <- c(Nit1, Njt1)
-  }
-  df[c(1:length(e)),6] <- c(e)
-  names(df) <- c("time","Ni","Nj","dNi","dNj","external.fact")
-  return(df)
-}
 
 Ricker_solution_mono <- function(gens,
                                  state,
@@ -253,42 +185,48 @@ Ricker_solution_mono <- function(gens,
 
 Ricker_solution_NatData <- function(gens,
                                     state,
-                                    pars) {
+                                    pars,
+                                    scalewidth,
+                                    neigh.vec) {
   function.int <- pars$function.int[1]
-  Nmax <- pars$Nmax # density at which fecundity is max - effect of neighbors is 0
   g <- pars$g[1] # germination rate 
   s <- pars$s[1] #seed survival
   lambda <- pars$lambda[1] # intrinsic growth rate
-  a_initial <- pars$alpha_init # which int.function
-  a_slope <- pars$alpha_slope # which int.function
-  c <- pars$alpha_c # which int.function
-   
   df <- state
-  
-  for(t in 1:(gens-1)){
+
+  for(t in 1:(gens)){
     Nt1 <- c()
     Fec <- c()
     Nt <-  df[t,]  # species i densities
+    Interaction_effect <- c()
+    for(n in neigh.vec){
+      Nmax <- pars$Nmax[which(pars$neigh==n)] # density at which fecundity is max - effect of neighbors is 0
+      a_initial <- pars$alpha_init[which(pars$neigh==n)] # which int.function
+      a_slope <- pars$alpha_slope[which(pars$neigh==n)]  # which int.function
+      c <- pars$alpha_c[which(pars$neigh==n)]  # which int.function
+      
     if(function.int==1){
         a <- a_initial
       }
       if(function.int==2){
-        a <- alpha_function2(a_initial, a_slope,g*Nt, Nmax)
+        a <- alpha_function2(a_initial, a_slope,Nt[n], Nmax)
       }
       if(function.int==3){
-        a <- alpha_function3(a_initial, a_slope,c,g*Nt, Nmax)
+        a <- alpha_function3(a_initial, a_slope,c,Nt[n], Nmax)
       }
       if(function.int==4){
-        a <- alpha_function4(a_initial, a_slope,c,g*Nt, Nmax)
+        a <- alpha_function4(a_initial, a_slope,c,Nt[n], Nmax)
       }
       
-      Fec <- exp(lambda + sum(a*g*Nt))
-      
-      Nt1 <- ((1-g) * s + g* Fec)*Nt$conspecific
-      df$conspecific[t+1] <- c(Nt1)
+      Interaction_effect[which(neigh.vec==n)] <- as.numeric(a*Nt[n])
+    }
+      Fec = exp(sum(Interaction_effect))
+      Nt1 <- (1-g)*s*Nt$seed.total.conspecific + lambda*Fec*Nt$conspecific
+      df$seed.total.conspecific[t+1] <- Nt1
+      df$conspecific[t+1] <- Nt1*g
+      df$fecundity[t] <- Fec
     }
     
-  df$time <- c(1:gens) 
   return(df)
 }
 # function modified from https://github.com/laurenmh/avena-erodium/blob/master/invader_resident_comparison.R
