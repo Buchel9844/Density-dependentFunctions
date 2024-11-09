@@ -200,8 +200,8 @@ for(Code.focal in "LARO"){ #focal.levels
   Nmedian <- c(SpMatrix[which.max(Fecundity),])
 
   # Upper bound intrinsic fecundity
-  Fmean <- ceiling(log(mean(Fecundity)))
-
+  Fmean <-mean(Fecundity) +sd(Fecundity)
+  
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #---- 3. BAYES FIT----
@@ -216,10 +216,15 @@ for(Code.focal in "LARO"){ #focal.levels
   
   alpha.function <- paste0("function_",which(function.vec==1))
   
-  
+  if(alphaFunct1==0){
+    load(paste0("results/stan/Parameters_",grouping,"_",Code.focal,"_function_1",".RData"))
+    parameters <- get(paste0("Parameters_",Code.focal,"_function_1"))
+    Fmean = median(parameters$lambda)
+    
+  }
   DataVec <- list(N=N, 
                   S=S+1,
-                  Fmean =Fmean  ,
+                  lambda_prior = Fmean,
                   Nmedian = Nmedian ,
                   Fecundity=Fecundity,
                   SpMatrix =SpMatrix,
@@ -240,11 +245,10 @@ for(Code.focal in "LARO"){ #focal.levels
   options(mc.cores = parallel::detectCores())
   # defiining initial value of lambda to help with computation failure
   # divide by the maximum expected for lambda = U 
-  list.init <- function(...)list(lambda= array(as.numeric(Fmean ), dim = 1))
-                                 #N_opt = array(as.numeric(Nmax), dim = S+1))
+  list.init <- function(...)list(lambda= array(as.numeric(Fmean), dim = 1),
+                                 N_opt = array(as.numeric(DataVec$Nmedian), 
+                                               dim = S+1))
   
-  
-
   if( run.stan == 1){                               
   FinalFit <- stan(file = "code/DensityFunct_Final.stan", 
                    data = DataVec,
@@ -351,7 +355,7 @@ for(Code.focal in "LARO"){ #focal.levels
        list(DataVec = DataVec,
             SpNames=SpNames,
        alpha_value= FinalPosteriors$alpha_value,      
-       lambda =  FinalPosteriors$lambda_ei,
+       lambda =  FinalPosteriors$lambda,
        alpha_slope = FinalPosteriors$alpha_slope,
        alpha_init =FinalPosteriors$alpha_init,
        alpha_c = FinalPosteriors$c,
@@ -465,7 +469,7 @@ for(Code.focal in "LARO" ){ #focal.levels
 }
 df_alpha_all <- df_alpha_all[-1,] # nrow = 120 == 4(fct) * 5(species) * 6(neighbours)
 str(df_alpha_all)
-
+view(df_alpha_all)
 levels(as.factor(df_alpha_all$neigh))
 source("code/1.1.PopProjection_toolbox.R")
 
@@ -533,8 +537,8 @@ df_funct_alpha <- df_funct_alpha %>%
                                    function.int==4 ~"4.Sigmoid"))
 
 
-dummy <- data.frame(uplimit=c(0.060,0.5,1.6,1),
-                    downlimit=c(-0.1,-1,-0.5,-0.5),
+dummy <- data.frame(uplimit=c(0.08,1,0.15,0.15),
+                    downlimit=c(-0.08,-2.5,-0.1,-0.1),
                     function.name = c("1.Traditional","2.Linear","3.Exp","4.Sigmoid"),
                     stringsAsFactors=FALSE)
 
@@ -549,13 +553,13 @@ for( i in c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")){
   plot_LAROalpha_list[[i]] <- ggplot(df,
                                        aes(x=density, y= alpha_value,
       color=neigh,fill=neigh,size=neigh,alpha=neigh)) +
+    geom_hline(yintercept=0, color="black", linetype="dashed",alpha=0.6,
+               size=1) +
     geom_line(stat="smooth",method = 'gam',
               se = TRUE,level =0.95,
-              alpha=0.7,
-              size=3) +
+              alpha=0.8,
+              size=2) +
     #stat_smooth(method = 'gam',se = TRUE,level =0.95,aes(size=neigh,alpha=neigh)) +
-    geom_hline(yintercept=0, color="black", linetype="dashed",
-               size=2) +
     scale_color_manual("Neighbours identity",values=rev(cbp2)) + 
     scale_fill_manual("Neighbours identity",
                       values=rev(cbp2)) + 
@@ -572,17 +576,14 @@ for( i in c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")){
                         minor_breaks = NULL,
                         breaks=c(0,5,10),
                         labels=c("0","5","10")) +
-    #scale_y_continuous(expand= c(0,0),
-     #                  minor_breaks = NULL,
-      #                 breaks=c(dummy$downlimit[which(dummy$function.name==i)],
-       #                         0,
-        #                        dummy$uplimit[which(dummy$function.name==i)])) +
+    scale_y_continuous(expand= c(0,0),
+                       minor_breaks = NULL) +
 
     guides(color= "none",fill="none",size="none",alpha="none") +
     coord_cartesian( xlim = NULL, 
                      #ylim=c(-1,1),
-                     #ylim = c(dummy$downlimit[which(dummy$function.name==i)],
-                     #dummy$uplimit[which(dummy$function.name==i)]),
+                     ylim = c(dummy$downlimit[which(dummy$function.name==i)],
+                     dummy$uplimit[which(dummy$function.name==i)]),
                      expand = TRUE, default = FALSE, clip = "on") +
     theme(plot.title = element_blank(),#element_text(color="#000000",
                                     #vjust = 0,
@@ -601,7 +602,8 @@ for( i in c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")){
           plot.margin = unit(c(1,1,0,0), 'lines')) 
   
 }
-
+plot_LAROalpha_list[[4]]
+plot_LAROalpha_list[[1]]
 plot_LAROalpha <- ggarrange( plotlist = plot_LAROalpha_list,
                               ncol=1,align = ("v"))
 
@@ -689,7 +691,7 @@ str(community_id_df) # already scaled by scale.width
 
 levels(as.factor(community_id_df$family))
 levels(as.factor(community_id_df$year))
-scale.width.local.pred = 15# define the width of local population 
+scale.width.local.pred = 15 # define the width of local population 
 # make df only for focal abundance over time
 
 fam.to.keep <- levels(as.factor(df_param_all$neigh))
@@ -707,8 +709,14 @@ community_id_df_fam <- community_id_df %>%
   spread(groups,count)
 str(community_id_df_fam)
 
+# select only LARO
 
-#----function to sample in the neighbours populations----
+community_id_df_LARO <- community_id_df %>% 
+  dplyr::filter(code=="LARO") %>%
+  aggregate(count ~ code + year + id.plot + collector +  family + scale.width, function(x) sum(x,na.rm=T)) %>%
+  mutate(count=(count)*scale.width.local.pred )
+
+#----4.2.1.function to sample in the neighbours populations----
 library(MASS)  #Code for univariate poisson - to sample a initial value for LARO
 abundance.sampling.poisson <- function(a,n){
   a <- a[!is.na(a)]
@@ -744,7 +752,7 @@ ggsave(data.frame(fitted   = as.vector(fitted(myPLN)),
   theme_bw() + annotation_logticks(),
   file="figures/Natcoom_PLNfit.pdf")
 
-#---Projection ----
+#----4.2.2.Projection ----
 df_projection <- NULL
 gens = 20
 scale.width.local.pred  =15
@@ -754,16 +762,17 @@ for(Code.focal in "LARO"){
     # produce fake data of abundance of neighbours based on their 
     # abundance relation establish with PLN. 
     # We set asteraceae and estimated the density of others based on it
-    id.plot.level <- levels(as.factor(community_id_df_fam$id.plot[which(community_id_df_fam$year==2023|community_id_df_fam$year==2022)]))
-    starting.df <- community_id_df_fam[which(community_id_df_fam$year==2023|community_id_df_fam$year==2022),] %>%
+    id.plot.level <- levels(as.factor(community_id_df_fam$id.plot[which(community_id_df_fam$year==2023 | community_id_df_fam$year==2022)]))
+    starting.df <- community_id_df_fam[which(community_id_df_fam$year==2023 |community_id_df_fam$year==2022),] %>%
       filter(id.plot ==  id.plot.level[sample(1:length( id.plot.level),1)]) %>%
-      dplyr::select(any_of(levels(as.factor(param.df$neigh)))) %>%
+      dplyr::select(any_of(levels(as.factor(df_param_all$neigh)))) %>%
       mutate(year=2023) %>%
       replace(is.na(.), 0)
     
-    median.a <- median(community_id_df_fam$asteraceae,na.rm=T)
-    state_df <- data.frame(asteraceae = round(abs(rnorm(gens,0,median.a)))) %>%
-            bind_cols(round(predict_cond(myPLN,newdata =data.frame(year=c(2024:2043)),
+    mean.a <- mean(community_id_df_fam$asteraceae,na.rm=T) 
+    sd.a <-sd(community_id_df_fam$asteraceae,na.rm=T)
+    state_df <- data.frame(asteraceae = round(abs(rnorm(gens,mean.a,sd.a)))) %>%
+            bind_cols(round(predict_cond(myPLN,newdata =data.frame(year=c(2024:(2024+gens-1))),
                                         cond_responses = .,type = c("response"),var_par = FALSE)))
     state_df <- bind_rows(starting.df,state_df) 
       
@@ -774,14 +783,18 @@ for(Code.focal in "LARO"){
     for(i0 in 1:num.0){
    state_df[vec.0.row[i0] ,vec.0.col[i0]] <-0 
     }
-    state_df$conspecific <- abundance.sampling.poisson(round(median(community_id_df_LARO$count)),1)
-    state_df$seed.total.conspecific<- state_df$conspecific /0.6 # germination rate
-    
+    state_df$conspecific <- abundance.sampling.poisson(round(mean(community_id_df_LARO$count)),1)
+    if(state_df$conspecific[1] ==0){
+      state_df$seed.total.conspecific <- 1
+    }else{
+      state_df$seed.total.conspecific<- state_df$conspecific/0.2 # germination rate
+    }
+
 for (function.int in c(1:4)){
     param.df <- df_param_all[which(df_param_all$function.int==function.int & 
                                      df_param_all$focal==Code.focal ),]
-    param.df$g = 0.6
-    param.df$s = 0.8
+    param.df$g = 0.2
+    param.df$s = 0.4
    df_projection_n <- Ricker_solution_NatData(gens=gens,
                                              state=state_df,
                                              pars = param.df,
@@ -791,7 +804,7 @@ for (function.int in c(1:4)){
   df_projection_n$sim <- i 
   df_projection_n$function.int <- function.int
   df_projection_n$focal <- Code.focal
-  df_projection_n$year<- c(2023:2043)
+  df_projection_n$year<- c(2023:(2023+gens))
   
   df_projection <- bind_rows(df_projection, df_projection_n)
   }
@@ -807,7 +820,6 @@ df_projection <- df_projection %>%
          key="species", value="abundance")   
 
 community_id_df_projectiongraph  <- community_id_df %>% 
-  dplyr::filter(year <2023) %>%
   mutate(family = case_when(!family %in% fam.to.keep ~ "rare",
                             T ~ family)) %>% 
   dplyr::filter(genus =="Lawrencella"|family %in% levels(as.factor(df_param_all$neigh))) %>%
@@ -835,9 +847,9 @@ allyear_communityprojection <- bind_rows(df_projection,
                                          community_id_df_projectiongraph.4 )
 
 
-dummy <- data.frame(uplimit=c(80,20,20,20),
-                    ylab=c(65,16,16,16),
-                    significance=c("*","","***","**"),
+dummy <- data.frame(uplimit=c(60,60,60,60),
+                    ylab=c(65,65,65,65),
+                    significance=c("","","",""),
                     function.name = c("1.Traditional","2.Linear","3.Exp","4.Sigmoid"),
                     stringsAsFactors=FALSE)
 
@@ -848,16 +860,23 @@ df_projection[which(df_projection$species=="conspecific"),] %>%
   aggregate(abundance ~ function.name, min)
 
 plot_projection_list <- list()
-for( i in c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")){ #"3.Exp"
+for( fi in 1:4 ){ #"3.Exp"
+  i <- c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")[fi]
+  title.vec <- c("Traditional constant",
+                 "Linear","Exponential",
+                 "Sigmoid")
+  
   df <- allyear_communityprojection %>%
     dplyr::filter(function.name==i) %>%
+    mutate(function.name=i) %>%
     mutate(species = factor(species, 
                             levels = c(family.neigh,"conspecific")))
            
-  
-  plot_projection_list[[i]] <- ggplot(df) +
+
+  plot_projection_list[[fi]] <- df  %>%
+    ggplot() +
     annotate("rect", xmin=2010,xmax=2023,
-            ymin=-5,ymax=1000,
+            ymin=0,ymax=80,
              fill="lightgrey",alpha=0.3) + 
     annotate("text", x=2020, y=dummy[which(dummy$function.name==i),"ylab"],
                label=dummy[which(dummy$function.name==i),"significance"],
@@ -867,8 +886,8 @@ for( i in c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")){ #"3.Exp"
                  color="black",
                  alpha=0.9,size=1.5,
                  fun.y = mean,
-                 fun.ymin = function(x) mean(x) - sd(x), 
-                 fun.ymax = function(x) mean(x) + sd(x), 
+                 fun.ymin = function(x) mean(x) -sd(x), 
+                 fun.ymax = function(x) mean(x) +sd(x), 
                  geom = "pointrange") +
     stat_summary(aes(y=abundance, x=year,
                      group=species,color=species,
@@ -907,16 +926,18 @@ for( i in c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")){ #"3.Exp"
            size= guide_legend(override.aes = list(size = 6)),
            linesize= guide_legend(override.aes = list(size = 2)),
            alpha= guide_legend(override.aes = list(alpha = 1))) +
-    coord_cartesian( xlim = NULL, ylim = c(-1,dummy$uplimit[which(dummy$function.name==i)])) + #ylim =c(-5,80)) + #
+    coord_cartesian( xlim = NULL, ylim = c(-1,
+                                          dummy$uplimit[which(dummy$function.name==i)])) + #ylim =c(-5,80)) + #
     scale_x_continuous(expand= c(0,0),minor_breaks = NULL) +
-    scale_y_continuous(expand= c(0,0),
-                       minor_breaks = NULL,
-                       breaks=c(0,20,40,60,80),
-                       labels=c(0,20,40,60,80)) +
+    scale_y_log10() +
+    #scale_y_continuous(expand= c(0,0),
+     #                  minor_breaks = NULL,
+     #                  breaks=c(0,20,40,60,80),
+     #                  labels=c(0,20,40,60,80)) +
     theme_bw() +
-      facet_wrap(.~function.name, strip.position="right") +
+    facet_wrap(.~function.name, strip.position="right") +
     theme(plot.title = element_blank(), #element_text(color="#000000",
-                                    #vjust = 0,size=24),
+          #vjust = 0,size=24),
           strip.background = element_blank(),
           strip.placement = "right",
           strip.text =element_text(color="black",
@@ -931,8 +952,8 @@ for( i in c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")){ #"3.Exp"
   
 }
 library(ggpubr)
-
-legend.plot <- as_ggplot(ggpubr::get_legend(plot_projection_list[[i]]))
+plot_projection_list[[4]]
+legend.plot <- as_ggplot(ggpubr::get_legend(plot_projection_list[[4]]))
 
 library(grid)
 plot_projection <- ggpubr::ggarrange( plotlist = plot_projection_list,
@@ -944,7 +965,7 @@ plot_projection <- ggpubr::ggarrange( plotlist = plot_projection_list,
 
 plot_projection
 plot_projection  <- annotate_figure(plot_projection  , 
-                              left = textGrob("Stem density in 15 x 15cm", 
+                              left = textGrob("Mean stem density in 15 x 15cm", 
                                              rot = 90, vjust = 0.5,
                                               gp = gpar(fontsize=20,cex = 1.3)),
                               bottom = textGrob("years", 
@@ -982,12 +1003,34 @@ plot_projection
 ggsave(plot_projection , 
        file = "figures/NatData_plot_poster.pdf")
 
-#----Supp Graphs----
-# graph of LARO's population density
-community_id_df_LARO <- community_id_df %>% 
-  dplyr::filter(code=="LARO") %>%
-  aggregate(count ~ code + year + id.plot + collector +  family + scale.width, function(x) sum(x,na.rm=T)) %>%
-  mutate(count=(count)*scale.width.local.pred )
+#----4.3.Supp Graphs----
+#----4.3.0.graph of Lambda----
+
+df_lambda <- NULL
+for(Code.focal in "LARO" ){ #focal.levels
+  for (function.int in c(1:4)){
+    df_alpha <- data.frame()
+    function.vec <- c(0,0,0,0)
+    function.vec[function.int] <- 1
+    alpha.function <- paste0("function_",which(function.vec==1))
+    
+    load(paste0("results/stan/Parameters_",grouping,"_",Code.focal,"_",alpha.function,".RData"))
+    parameters <- get(paste0("Parameters_",Code.focal,"_",alpha.function))
+    df_lambda <- bind_rows(df_lambda,
+                           data.frame(function.int=alpha.function,
+                                      lambda=parameters$lambda))
+    
+  }
+}
+str(df_lambda)
+library(ggridges)
+ggsave(df_lambda %>%
+  ggplot(aes(x=lambda,y=as.factor(function.int)))  +
+    geom_density_ridges(scale=1,quantile_lines = TRUE) +
+  theme_bw(),
+  file="figures/NatCom_lambda.pdf")
+
+#----4.3.1.graph of LARO's population density----
 str(community_id_df_LARO)
 ggsave(community_id_df_LARO %>%
          filter(count>0) %>%
@@ -1000,7 +1043,7 @@ ggsave(community_id_df_LARO %>%
                axis.title = element_text(size=20)),
        file="figures/NatCom_LARODensity.pdf")
 
-# graph of neighbours population density
+#----4.3.2.graph of neighbours population density----
 library(ggridges)
 ggsave(community_id_df_fam %>%
          gather(any_of(c(fam.to.keep,"rare")),
@@ -1017,7 +1060,7 @@ ggsave(community_id_df_fam %>%
                axis.title = element_text(size=16)),
        file="figures/NatCom_NeighbourhoodDensity.pdf")
 
-# graph of realised effect on lambda
+#----4.3.3.graph of realised effect on lambda----
 str(community_id_df_fam)
 
 realised.effect.df <- community_id_df %>% 
@@ -1083,7 +1126,7 @@ ggsave(realised.effect.df %>%
                     labels=c("Araliaceae","Asteraceae","Crassulaceae",
                              "Goddeniaceae","Montiaceae","Poaceae","Rare families","LARO")) +
   facet_grid(.~function.name)  +
-  coord_cartesian(ylim=c(0,5)) +
+  coord_cartesian(ylim=c(0,3)) +
   guides(fill=guide_legend("",position="bottom",
                             direction="horizontal",
                             byrow = TRUE,
@@ -1104,7 +1147,7 @@ ggsave(realised.effect.df %>%
         plot.margin = unit(c(1,1,1,1), 'lines')),
   file="figures/Nat.com.realised.effect.pdf")
   
-# Table of projection summary
+#----4.3.4.Table of projection summary----
 summary.proj <- df_projection[which(df_projection$species=="conspecific"),] %>%
   group_by(function.name) %>% 
   mutate(ab.mean = mean(abundance, na.rm = T),
@@ -1113,7 +1156,7 @@ summary.proj <- df_projection[which(df_projection$species=="conspecific"),] %>%
          ab.median =median(abundance,na.rm=T),
          ab.sd =sd(abundance,na.rm=T),
          dfreedom= length(abundance)-1) %>%
-  select(function.name,ab.min,ab.max,ab.mean,ab.sd,ab.median,dfreedom) %>%
+  dplyr::select(function.name,ab.min,ab.max,ab.mean,ab.sd,ab.median,dfreedom) %>%
   unique() %>%
   ungroup() 
 summary.proj
@@ -1144,7 +1187,7 @@ ggsave(
   file="figures/density.proj.pdf")
 
 
-#---- 4.3. Compare model for each focal  ----
+#---- 4.4. Compare model for each focal  ----
 # reference : Vehtari, A., Gelman, A., and Gabry, J. (2017). Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC. Statistics and Computing. 27(5), 1413–1432. :10.1007/s11222-016-9696-4. online, arXiv preprint arXiv:1507.04544.
 model.loo <- list()
 
@@ -1199,7 +1242,7 @@ Se_loo_model<- Se_loo_model %>%
 write.csv(Se_loo_model,
           paste0("results/LARO_Se_loo_model.csv"))
 
-#---- 4.3. Figure of fecundity estimation distribution ----
+#---- 4.5. Figure of fecundity estimation distribution ----
 source("code/stan_modelcheck_rem.R")
 function.names <- c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")
   pdf(paste0("figures/NatData_PostFecundity_distribution.pdf")) 
