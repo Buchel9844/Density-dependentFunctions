@@ -4,7 +4,8 @@
 data{
   int<lower = 1> N;  // Number of plots/obs
   int<lower = 1> S;  // Number of species
-  int<lower = 0> Nmedian[S];
+  vector<lower = 0>[S] Nmedian;
+  real lambda_prior;
   int Fecundity[N];  // Fecundity of the focal species in each plot
   matrix[N,S] SpMatrix;  // Matrix of abundances for each species (including abundances of non-focal individuals of the focal species)
    int<lower = 0, upper = 1> run_estimation; // a switch to evaluate the likelihood
@@ -19,10 +20,14 @@ parameters{
   vector<lower=0>[1] lambda; // intrinsic growth rate - always positive
   vector<lower=0>[S] N_opt; // intrinsic growth rate - always positive
 
-  vector<lower=-1,upper =0>[S] c; //stretching parameters
+  vector<upper =0>[S] c; //stretching parameters
 
-  vector<lower=-1,upper =1>[S] alpha_initial; // initial effect of j on i - when Nj is minimal
+  //vector<lower=-1,upper =1>[S] alpha_initial; // initial effect of j on i - when Nj is minimal
   vector<lower=-1,upper =0>[S] alpha_slope; // decay - impact of the addition of one individual of j, on the fecundity of i. 
+  //vector<upper =0>[S] c; //stretching parameters
+
+  vector[S] alpha_initial; // initial effect of j on i - when Nj is minimal
+  //vector<upper =0>[S] alpha_slope; // decay - impact of the addition of one individual of j, on the fecundity of i. 
 
     
   real<lower=0> disp_dev; // species-specific dispersion deviation parameter,
@@ -35,39 +40,34 @@ transformed parameters{
  // Declare objects necessary for the rest of the model, including: a vector of expected fecundity values (F_hat),
   //     a matrix of the species specific alpha values for each species and plot (interaction_effects), and a matrix
   //     of the the alpha*N values for each species.
-  vector[N] F_hat;
+  vector<lower=0>[N] F_hat;
   
  // loop parameters
   matrix[N,S] alpha_function_eij;
   matrix[N,S] alpha_value;
-  vector[N] lambda_ei;
-  matrix[N,S] N_opt_ei;
   
   // implement the biological model
   for(i in 1:N){
-    lambda_ei[i] = lambda[1];
     for(s in 1:S){
-      N_opt_ei[i,s] = N_opt[s];
-    //scaling factor
       if(alphaFunct1 ==1){
       alpha_value[i,s]= alpha_initial[s];
       alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct2 ==1){
-       alpha_value[i,s] = alpha_initial[s] +  alpha_slope[s]*(SpMatrix[i,s]-N_opt_ei[i,s]);
+       alpha_value[i,s] = alpha_initial[s] +  alpha_slope[s]*(SpMatrix[i,s]-N_opt[s]);
        alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct3 ==1){
-         alpha_value[i,s] = alpha_initial[s] + c[s]*(1 - exp( alpha_slope[s]*(SpMatrix[i,s]-N_opt_ei[i,s])));
+         alpha_value[i,s] = alpha_initial[s] + c[s]*(1 - exp( alpha_slope[s]*(SpMatrix[i,s]-N_opt[s])));
          alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
       if(alphaFunct4 ==1){
-         alpha_value[i,s]= alpha_initial[s] + (c[s]*(1 - exp( alpha_slope[s]*(SpMatrix[i,s]-N_opt_ei[i,s]))))/(1+exp( alpha_slope[s]*(SpMatrix[i,s]-N_opt_ei[i,s])));
+         alpha_value[i,s]= alpha_initial[s] + (c[s]*(1 - exp( alpha_slope[s]*(SpMatrix[i,s]-N_opt[s]))))/(1+exp( alpha_slope[s]*(SpMatrix[i,s]-N_opt[s])));
          alpha_function_eij[i,s]= alpha_value[i,s]*SpMatrix[i,s];
       }
     }
     
- F_hat[i] = exp(lambda_ei[i] + sum(alpha_function_eij[i,]));
+ F_hat[i] = lambda[1]*exp( sum(alpha_function_eij[i,]));
 
   }
 
@@ -75,13 +75,13 @@ transformed parameters{
 
 model{
   // set regular priors
-  alpha_initial ~ normal(0,1);
-  alpha_slope ~ normal(0,1);
-  lambda ~ normal(0,1);
+  alpha_initial ~ normal(0,0.1);
+  alpha_slope ~ normal(-0.2,0.2);
+  lambda ~ normal(lambda_prior,10);
   for( s in 1:S){
-  N_opt[s] ~ normal(Nmedian[s],1);
+  N_opt[s] ~ normal(0,1);
   }
-  c ~ normal(0, 1);
+  c ~ normal(0, 0.1);
   disp_dev ~ cauchy(0, 1);  // safer to place prior on disp_dev than on phi
   
  for(i in 1:N){
