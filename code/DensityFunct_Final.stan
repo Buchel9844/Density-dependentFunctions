@@ -67,7 +67,7 @@ transformed parameters{
       }
     }
     
- F_hat[i] = lambda[1]*exp( sum(alpha_function_eij[i,]));
+ F_hat[i] = lambda[1]*exp(sum(alpha_function_eij[i,]));
 
   }
 
@@ -79,7 +79,7 @@ model{
   alpha_slope ~ normal(-0.2,0.2);
   lambda ~ normal(lambda_prior,10);
   for( s in 1:S){
-  N_opt[s] ~ normal(0,1);
+  N_opt[s] ~ normal(Nmedian[s],1);
   }
   c ~ normal(0, 0.1);
   disp_dev ~ cauchy(0, 1);  // safer to place prior on disp_dev than on phi
