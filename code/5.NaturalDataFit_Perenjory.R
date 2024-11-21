@@ -200,7 +200,7 @@ for(Code.focal in "LARO"){ #focal.levels
   Nmedian <- c(SpMatrix[which.max(Fecundity),])
 
   # Upper bound intrinsic fecundity
-  Fmean <-mean(Fecundity) +sd(Fecundity)
+  Fmean <- mean(Fecundity) +sd(Fecundity)
   
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -245,21 +245,19 @@ for(Code.focal in "LARO"){ #focal.levels
   options(mc.cores = parallel::detectCores())
   # defiining initial value of lambda to help with computation failure
   # divide by the maximum expected for lambda = U 
-  list.init <- function(...)list(lambda= array(as.numeric(Fmean), dim = 1),
-                                 N_opt = array(as.numeric(DataVec$Nmedian), 
-                                               dim = S+1))
+  list.init <- function(...)list(lambda= array(as.numeric(Fmean), dim = 1))
   
   if( run.stan == 1){                               
   FinalFit <- stan(file = "code/DensityFunct_Final.stan", 
                    data = DataVec,
                    init=  list.init,
                    #init =  "random",
-                   warmup= 500,
-                   iter = 1000, 
+                   warmup= 1000,
+                   iter = 3000, 
                    init_r = 2,
                    chains = 4,
                    control=list(max_treedepth=15),
-                   seed= 1644)
+                   seed= 16)
   
   
   save(file= paste0("results/stan/FinalFit_",grouping,"_",Code.focal,"_",alpha.function,".rds"),
@@ -269,12 +267,12 @@ for(Code.focal in "LARO"){ #focal.levels
    FinalFit <- stan(file = "code/DensityFunct_Final.stan", 
                      data = DataVec,
                      init =  "random",
-                     warmup= 500,
-                     iter = 1000, 
+                     warmup= 1000,
+                     iter = 3000, 
                      init_r = 2,
                      chains = 4,
                      control=list(max_treedepth=15),
-                     seed= 1644)
+                     seed= 16)
    save(file= paste0("results/stan/FinalFit_",grouping,"_",Code.focal,"_",alpha.function,".rds"),
         FinalFit)
     
@@ -537,9 +535,13 @@ df_funct_alpha <- df_funct_alpha %>%
                                    function.int==4 ~"4.Sigmoid"))
 
 
-dummy <- data.frame(uplimit=c(0.08,1,0.15,0.15),
-                    downlimit=c(-0.08,-2.5,-0.1,-0.1),
+dummy <- data.frame(uplimit=c(0.08,1,0.30,0.15),
+                    downlimit=c(-0.08,-1,-0.1,-0.1),
                     function.name = c("1.Traditional","2.Linear","3.Exp","4.Sigmoid"),
+                    label.title= c("a. Traditional constant",
+                                   "b. Linear","c. Exponential",
+                                   "d. Sigmoid"),
+                    margindown = c(-1,-1,1,1),
                     stringsAsFactors=FALSE)
 
 plot_LAROalpha_list <- list()
@@ -548,18 +550,20 @@ family.neigh <- family.neigh[!family.neigh=="conspecific"]
 for( i in c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")){
   df <- df_funct_alpha %>%
     dplyr::filter(focal == "LARO" & function.name==i)%>%
+    mutate(neigh = case_when(neigh =="conspecific" ~ "LARO",
+                             T ~ neigh)) %>%
     mutate(neigh= factor(neigh, 
-                            levels = c(family.neigh,"conspecific")))
+                            levels = c(family.neigh,"LARO")))
+
   plot_LAROalpha_list[[i]] <- ggplot(df,
                                        aes(x=density, y= alpha_value,
       color=neigh,fill=neigh,size=neigh,alpha=neigh)) +
     geom_hline(yintercept=0, color="black", linetype="dashed",alpha=0.6,
-               size=1) +
+               size=2) +
     geom_line(stat="smooth",method = 'gam',
               se = TRUE,level =0.95,
               alpha=0.8,
-              size=2) +
-    #stat_smooth(method = 'gam',se = TRUE,level =0.95,aes(size=neigh,alpha=neigh)) +
+              size=3) +
     scale_color_manual("Neighbours identity",values=rev(cbp2)) + 
     scale_fill_manual("Neighbours identity",
                       values=rev(cbp2)) + 
@@ -568,7 +572,7 @@ for( i in c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")){
     scale_alpha_manual("Neighbours identity",
                        values=c(1, rep(0.8,length(family.neigh)))) + 
     theme_bw() +
-    labs(title = i ,
+    labs(title = dummy$label.title[which(dummy$function.name==i)] ,
       y= "Per capita effect of neighbours on focal",
       x="density of neighbours") +
     rremove("ylab") + rremove("xlab") + 
@@ -578,42 +582,44 @@ for( i in c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")){
                         labels=c("0","5","10")) +
     scale_y_continuous(expand= c(0,0),
                        minor_breaks = NULL) +
-
-    guides(color= "none",fill="none",size="none",alpha="none") +
+    guides(size="none",alpha="none") +
     coord_cartesian( xlim = NULL, 
                      #ylim=c(-1,1),
                      ylim = c(dummy$downlimit[which(dummy$function.name==i)],
                      dummy$uplimit[which(dummy$function.name==i)]),
                      expand = TRUE, default = FALSE, clip = "on") +
-    theme(plot.title = element_blank(),#element_text(color="#000000",
-                                    #vjust = 0,
-                                    #size=24),
-          
-          strip.background = element_blank(), 
-          strip.placement = "outside",
+    theme(plot.title = element_text(color="#000000",
+                                    vjust = 0,
+                                    size=24,face = "bold"),
           strip.text =element_text(color="black",size=20),
           legend.key= element_rect(fill = "white"),
-          legend.text=element_text(size=20),
-          legend.title=element_blank(),
-          axis.text.x = element_text(color="black",size=16),
-          axis.text.y = element_text(color="black",
-                                     size=16),
           legend.key.size = unit(1, 'cm'),
-          plot.margin = unit(c(1,1,0,0), 'lines')) 
+          legend.text=element_text(size=20),
+          legend.background = element_blank(),
+          legend.box.background = element_rect(colour = "lightgrey"),
+          legend.position = "bottom",
+          legend.title=element_text(size=20),
+          axis.text.x = element_text(color="black",size=16),
+          axis.text.y = element_text(color="black",size=16),
+          plot.margin = unit(c(0,0.5,
+                               dummy$margindown[which(dummy$function.name==i)],
+                               0.5), 'cm')) 
   
 }
 plot_LAROalpha_list[[4]]
 plot_LAROalpha_list[[1]]
 plot_LAROalpha <- ggarrange( plotlist = plot_LAROalpha_list,
-                              ncol=1,align = ("v"))
-
-plot_LAROalpha <- annotate_figure(plot_LAROalpha , 
-                                  left = textGrob("Per capita effect of neighbours on focal", 
+                              ncol=2,nrow=2,common.legend = T,
+                             legend = "bottom",
+                             align = c("hv"))
+plot_LAROalpha.2 <- annotate_figure(plot_LAROalpha , 
+                                  left = textGrob("Per capita effect of neighbours on LARO", 
                                                   rot = 90, vjust = 0.5, #hjust=1, 
                                                   gp = gpar(fontsize=20,cex = 1.3)),
-                                  bottom = textGrob("Density of neighbours",  
+                                  bottom = textGrob("Density of neighbours", 
+                                                    vjust=-5.2, hjust=0.4,
                                                     gp = gpar(fontsize=20,cex = 1.3))) 
-plot_LAROalpha
+plot_LAROalpha.2
 ggsave(plot_LAROalpha,
        file = "figures/NatData_plot_LARO.pdf")
 
@@ -759,6 +765,7 @@ scale.width.local.pred  =15
 
 for(Code.focal in "LARO"){
   for(i in 1:100){
+    print(i)
     # produce fake data of abundance of neighbours based on their 
     # abundance relation establish with PLN. 
     # We set asteraceae and estimated the density of others based on it
@@ -860,17 +867,20 @@ df_projection[which(df_projection$species=="conspecific"),] %>%
   aggregate(abundance ~ function.name, min)
 
 plot_projection_list <- list()
+plot_density_projection_list <- list()
 for( fi in 1:4 ){ #"3.Exp"
   i <- c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")[fi]
-  title.vec <- c("Traditional constant",
-                 "Linear","Exponential",
-                 "Sigmoid")
+  title.vec <- c("a. Traditional constant",
+                 "b. Linear","c. Exponential",
+                 "d. Sigmoid")
   
   df <- allyear_communityprojection %>%
     dplyr::filter(function.name==i) %>%
     mutate(function.name=i) %>%
     mutate(species = factor(species, 
-                            levels = c(family.neigh,"conspecific")))
+                            levels = c(family.neigh,"conspecific"))) %>%
+    mutate(past = case_when( year < "2024" ~ "observed",
+                             year > "2023" ~ "predicted"))
            
 
   plot_projection_list[[fi]] <- df  %>%
@@ -915,7 +925,7 @@ for( fi in 1:4 ){ #"3.Exp"
                                "Goddeniaceae","Montiaceae","Poaceae","Rare families",
                                "LARO")) + 
     theme_bw() +
-    labs(title = i,
+    labs(title = title.vec[fi],
          y= "",
          x="") +
     rremove("ylab") + rremove("xlab") + 
@@ -926,18 +936,16 @@ for( fi in 1:4 ){ #"3.Exp"
            size= guide_legend(override.aes = list(size = 6)),
            linesize= guide_legend(override.aes = list(size = 2)),
            alpha= guide_legend(override.aes = list(alpha = 1))) +
-    coord_cartesian( xlim = NULL, ylim = c(-1,
-                                          dummy$uplimit[which(dummy$function.name==i)])) + #ylim =c(-5,80)) + #
+    coord_cartesian( xlim = NULL, ylim = c(-1,40)) + #ylim =c(-5,80)) + #
     scale_x_continuous(expand= c(0,0),minor_breaks = NULL) +
-    scale_y_log10() +
+    #scale_y_log10() +
     #scale_y_continuous(expand= c(0,0),
      #                  minor_breaks = NULL,
      #                  breaks=c(0,20,40,60,80),
      #                  labels=c(0,20,40,60,80)) +
     theme_bw() +
-    facet_wrap(.~function.name, strip.position="right") +
-    theme(plot.title = element_blank(), #element_text(color="#000000",
-          #vjust = 0,size=24),
+    theme(plot.title = element_text(color="#000000",
+                                    vjust = 0,size=24),
           strip.background = element_blank(),
           strip.placement = "right",
           strip.text =element_text(color="black",
@@ -948,52 +956,99 @@ for( fi in 1:4 ){ #"3.Exp"
           axis.text.x = element_text(color="black",size=16),
           axis.text.y = element_text(color="black",size=16),
           legend.key.size = unit(1, 'cm'),
-          plot.margin = unit(c(1,1,-1,0), 'lines'))
-  
+          plot.margin = unit(c(0,-2,0,0), 'lines')) 
+  plot_density_projection_list[[fi]]  <- ggplot() +
+    geom_density_ridges2(data=df[which(df$species=="conspecific" &
+                                         df$past =="observed"),],
+                         aes(x=abundance,y=past, fill=past),
+                         jittered_points = TRUE, 
+            scale=1, alpha=0.8,
+            point_size = 0.1, point_alpha = 0.05,
+            position = position_raincloud(adjust_vlines = TRUE,
+                                          height = 0.15,
+                                          ygap = 0),
+            quantile_lines = TRUE,
+            quantiles = c( 0.5),
+            vline_color = c("red"),vline_width=3)  +
+    geom_density_ridges2(data=df[which(df$species=="conspecific" &
+                                         df$past =="predicted"),],
+                         aes(x=abundance,y=past, fill=past),
+                         jittered_points = TRUE, 
+                         scale=4,alpha=0.8,
+                         point_size = 0.1, point_alpha = 0.05,
+                         position = position_raincloud(adjust_vlines = TRUE,
+                                                       height = 0.15,
+                                                       ygap = 0),
+                         quantile_lines = TRUE,
+                         quantiles = c( 0.5),
+                         vline_color = c("red"),vline_width=3)  +
+    scale_fill_manual(values=c("lightgrey","black")) +
+    coord_flip(xlim = c(-1,40), ylim = c(1,2), expand = c(0.01)) +
+    guides(fill= guide_legend("",position="bottom",
+                               direction="horizontal",
+                               byrow = TRUE,
+                               nrow = 2,
+                              override.aes = list(quantile_lines = F))) + 
+    theme_few() + 
+    theme(plot.title = element_blank(), 
+          legend.key= element_rect(fill = "white"),
+          legend.text=element_text(size=18),
+          panel.border = element_blank(),
+          legend.title=element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          axis.title = element_blank(),
+          legend.key.size = unit(1, 'cm'),
+          panel.background = element_rect(fill='transparent'),
+          plot.background = element_rect(fill='transparent', color=NA), #transparent plot bg
+          panel.grid.major = element_blank(), #remove major gridlines
+          panel.grid.minor = element_blank(), #remove minor gridlines
+          plot.margin = unit(c(0,0,0,0), 'lines'))
+  plot_density_projection_list[[fi]] 
 }
-library(ggpubr)
-plot_projection_list[[4]]
-legend.plot <- as_ggplot(ggpubr::get_legend(plot_projection_list[[4]]))
+plot_list <- list()
+for(i in 1:4){
+  plot_list[[i]] <- ggpubr::ggarrange( plot_projection_list[[i]] + theme(legend.position = "none",),
+                                        plot_density_projection_list[[i]] +theme(legend.position = "none"),
+                                        ncol=2,widths=c(1,0.5),
+                                        align = c("h"))
+}
 
-library(grid)
-plot_projection <- ggpubr::ggarrange( plotlist = plot_projection_list,
-           ncol=1,
-           align = c("v"),
-           common.legend = F,
-           legend="none")
-
-
+plot_projection <- ggpubr::ggarrange(plotlist=plot_list,
+                   ncol=1, nrow=4,heights = c(1,1,1,1),
+                   common.legend = T,
+                   legend="bottom",
+                   align = c("hv"))
 plot_projection
-plot_projection  <- annotate_figure(plot_projection  , 
+library(grid)
+library(ggridges)
+library(ggpubr)
+
+plot_projection.2  <- annotate_figure(plot_projection  , 
                               left = textGrob("Mean stem density in 15 x 15cm", 
                                              rot = 90, vjust = 0.5,
-                                              gp = gpar(fontsize=20,cex = 1.3)),
-                              bottom = textGrob("years", 
-                                                #vjust = -0.5,
-                                                gp = gpar(fontsize=20,cex = 1.3)))+
-                              #top= textGrob("Past observations                    Predicted density", 
-                              #              rot = 0, hjust = 0.55,
-                              #              gp = gpar(fontsize=20,cex = 1.3))
+                                              gp = gpar(fontsize=20,cex = 1.3)))+
 
   theme(plot.margin = unit(c(0,0,0,2), 'lines'))
 
-plot_projection 
+plot_projection.2
 
-plot_projection_alpha <- ggarrange(plot_LAROalpha,
-                                   plot_projection,
-                                   ncol=2, 
-                                   align = c("h"),
-                                   widths=c(1,2),
-          legend = "none", common.legend = F) 
+legend.plot <- as_ggplot(ggpubr::get_legend(plot_projection_list[[4]]))
+legend.density.plot <- as_ggplot(ggpubr::get_legend(plot_density_projection_list[[1]]))
 
-plot_projection_alpha <- ggarrange(plot_projection_alpha ,
-                                   legend.plot,
-                                   ncol=1,nrow=2,
-                                   align = c("h"),
-                                   heights=c(8,1),
-                                   legend = "none", 
-                                   common.legend = F) 
-plot_projection_alpha 
+
+plot_projection_legend <- ggarrange(plot_projection.2,
+                                    heights=c(1,0.1),
+                                   ggarrange(legend.plot,legend.density.plot,nrow=1,widths=c(1,0.3)),
+                                   ncol=1) 
+plot_projection_legend <-  annotate_figure(plot_projection_legend , 
+                 bottom= textGrob("0.5",
+                                  vjust = -6.8,hjust=-11.6,
+                                  gp = gpar(fontsize=14,
+                                            cex = 1.3,
+                                            col="red"))) +
+ theme(plot.margin = unit(c(0,0,-1,-1), 'lines'))
+plot_projection_legend
 ggsave(plot_projection_alpha , 
        file = "figures/NatData_plot_projection.pdf")
 
@@ -1149,6 +1204,8 @@ ggsave(realised.effect.df %>%
   
 #----4.3.4.Table of projection summary----
 summary.proj <- df_projection[which(df_projection$species=="conspecific"),] %>%
+  bind_rows(community_id_df_LARO %>% mutate(function.name="observed") %>%
+              rename("abundance"="count")) %>%
   group_by(function.name) %>% 
   mutate(ab.mean = mean(abundance, na.rm = T),
          ab.max = max(abundance, na.rm = T),
@@ -1160,6 +1217,7 @@ summary.proj <- df_projection[which(df_projection$species=="conspecific"),] %>%
   unique() %>%
   ungroup() 
 summary.proj
+str(community_id_df_LARO )
 write.csv(summary.proj, file="results/summary.proj.csv")
 
 # Graph of density distribution 
