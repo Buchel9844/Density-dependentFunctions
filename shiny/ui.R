@@ -76,8 +76,20 @@ fluidPage(
                   min = 0,
                   max = 10,
                   value = 5,
-                  step=1)
-    ),
+                  step=1),
+    sliderInput("g",
+                label ="Germination rate:",
+                min = 0,
+                max = 1,
+                value = 0.5,
+                step=0.02),
+  sliderInput("s",
+              label ="Seed survival rate:",
+              min = 0,
+              max = 1,
+              value = 0.5,
+              step=0.02)
+  ),
     
     # Show a plot of the generated distribution
     mainPanel(   h3("Community dynamics:"),width=9,
@@ -97,14 +109,23 @@ fluidPage(
                  ),
                  br(),
                  fluidRow(
+                   splitLayout(cellWidths = c("100%"), 
+                               tags$b("Graphs of the 4 functions:"))
+                 ),
+                 fluidRow(
+                   splitLayout(cellWidths = c("100%"), 
+                               plotOutput("plotfunctions"))
+                 ),
+                 br(),
+                 fluidRow(
                    splitLayout(cellWidths = c("50%", "50%"), 
-                               tags$b("Graphs of the 4 functions:"),
-                               tags$b("Graphs of fecundity of species i in fucntion of Nj:"))
+                               tags$b("Graphs of fecundity of species i in function of Nj:"),
+                               tags$b("Graphs of Seed rate of species i in function of Nj:"))
                  ),
                  fluidRow(
                    splitLayout(cellWidths = c("50%", "50%"), 
-                               plotOutput("plotfunctions"), 
-                               plotOutput("Fecundityplot"))
+                               plotOutput("Fecundityplot"),
+                               plotOutput("GRplot"))
                  ),
                  br()
                  
