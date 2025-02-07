@@ -76,7 +76,7 @@
     
     
     
-    ggarrange(f1,f2,f3,f4,ncol=2,nrow=2)
+    ggarrange(f1,f2,f3,f4,ncol=4,nrow=1)
     
   }
   fecundity.plot <- function(function.alpha,lambda,
@@ -100,7 +100,33 @@
     
     
     Fi <- exp(lambda + aii*Ni + aij*Nj)
-    return(log(Fi))
+    return(Fi)
+  }
+  
+  Growthrate <- function(function.alpha,lambda,
+                             Amin, Aslope,C,Nj,Ni,Ni0,Nj0,
+                         g,s){
+    if(function.alpha == 1){
+      aii <- 0.2
+      aij <- Amin
+    }
+    if(function.alpha == 2){
+      aii <- 0.2 + 0.2*(Ni-Ni0)
+      aij <- alpha_function2(Amin, Aslope,Nj,Nj0)
+    }
+    if(function.alpha == 3){
+      aii <- half.signoidal.function(-0.2, -0.2,C ,Ni,No =Ni0)
+      aij <- half.signoidal.function(Amin, Aslope,C ,Nj,No =Nj0)
+    }
+    if(function.alpha == 4){
+      aii <- signoidal.function(-0.2, -0.2, C ,Ni,No =Ni0)
+      aij <- signoidal.function(Amin, Aslope,C ,Nj, No =Nj0)
+    }
+    
+    
+    Fi <- exp(lambda + aii*Ni + aij*Nj)
+    GRi <- (1-g)*s + Fi*g
+    return(log(GRi))
   }
   
   output$ComDyn <- renderUI({
@@ -163,10 +189,35 @@
       #geom_smooth(alpha=0.8,color="grey") + 
       labs(title="Fecundity distribution") + 
       geom_point() +
-      xlab("Neighbour density of species j") + ylab("Fecundity of species i (ln)")+
+      xlab("Neighbour density of species j") + ylab("Fecundity of species i")+
       theme_bw()
   }, res = 96)
   
+  output$GRplot<- renderPlot({
+    Amin =input$Ainit
+    Aslope = input$Aslope
+    C = input$C
+    Nj0= input$No
+    Ni0= 0  
+    Ni = input$Ni
+    Nj = seq(input$RangeNj[1],
+             input$RangeNj[2],1)
+    lambda = input$lambda
+    function.alpha= input$functiontype
+    g= input$g
+    s= input$s
+    ggplot(data.frame(Nj = Nj,
+                      GRi=  Growthrate(function.alpha=function.alpha,lambda=lambda,
+                                              Amin=Amin, Aslope=Aslope, 
+                                              C =C,Nj=Nj,Ni=Ni,Ni0=Ni0,Nj0 = Nj0,
+                                              g=g,s=s)), 
+           aes(y=GRi, x= Nj))+
+      #geom_smooth(alpha=0.8,color="grey") + 
+      labs(title="Growth rate distribution") + 
+      geom_point() +
+      xlab("Neighbour density of species j") + ylab("Growth rate/Seed rate of species i (ln)")+
+      theme_bw()
+  }, res = 96)
   
   
 }
