@@ -17,8 +17,9 @@ Authorship of data: Members of the Mayfield lab. We want to thank John Dwyer, Cl
 
 Authorship of code: R Code was written by Lisa Buche.
 
+The Folder "Shiny" contains the code to run the ShinyApp, which is also available online
 
-Details of R script and their function:
+Details of R script and their function in the folder CODE:
 
 1.ComputeSim.R - Simulated the communities within the parameters' ranges based on the Ricker model and the functional forms which are written as fucntion in  "1.1PopProjection_tollbox.R". This script runs a loop to simulated the time series of the 1500 communities. The script also gives multiple ways to visualise the simulated communities and create Fig 2 and Fig S1 in the Appendix (some of which are not included in the manuscript).  
 
