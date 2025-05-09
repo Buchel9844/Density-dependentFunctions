@@ -2,7 +2,7 @@ library(IDPmisc) # for function NaRV.omit()
 library(ggpattern)
 library(ggpubr)
 ##########################################################################################################
-# 1. minimum  abundance
+#---- 1. minimum  abundance----
 ##########################################################################################################
 df.sim <- as.data.frame(df.sim)
 df.min.abundance <- NULL
@@ -98,8 +98,17 @@ df.min.abun.horyzontal <- full_join(df.min.abundance[which(df.min.abundance$foca
   mutate(comp.com = factor(comp.com, levels=c("run away population","no species","one-species community","two-species community")),
          Interspecific.interaction = factor(Interspecific.interaction,
                                             levels=c("competition","both","facilitation")))
-
-
+write.csv(df.min.abun.horyzontal %>%
+  filter(external_factor =="No external factor" ) %>%
+  group_by(Interspecific.interaction ,comp.com,function.int) %>%
+  summarise(num.com = (n()/500)*100) %>%
+  spread(Interspecific.interaction,num.com) %>%
+    mutate(function.name = case_when(function.int==1 ~"Traditional constant",
+                                     function.int==2 ~"Linear",
+                                     function.int==3 ~"Exponential",
+                                     function.int==4 ~"Sigmoid")),
+  "results/df.coexistence.prob.csv")
+#read.csv("results/df.coexistence.prob.csv")
 # visualisation
 #my_cols <- c("#AA4499", "#DDCC77","#88CCEE", "#44AA99")
 cols_interaction <- c("#661100", "#888888", "#6699CC", "#332288") # "#DDCC77","#661100","#117733")
@@ -107,40 +116,52 @@ safe_colorblind_palette <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#33228
                              "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888")
 
 df.min.abun.horyzontal$comp.com
-com.comp.plot.1 <- df.min.abun.horyzontal %>%
-  mutate(function.name = case_when(function.int==1 ~"a - Traditional constant",
-                                   function.int==2 ~"b - Linear",
-                                   function.int==3 ~"c - Exp",
-                                   function.int==4 ~"d - Sigmoid")) %>%
+com.comp.plot.1<-list()
+com.comp.plot.2<-list()
+for(fi in 1:4){
+  title.vec <- c("Traditional constant",
+                 "Linear","Exponential",
+                 "Sigmoid")
+
+com.comp.plot.1[[fi]] <- df.min.abun.horyzontal %>%
+  mutate(function.name = case_when(function.int==1 ~"Traditional constant",
+                                   function.int==2 ~"Linear",
+                                   function.int==3 ~"Exponential",
+                                   function.int==4 ~"Sigmoid")) %>%
   mutate(function.name  = factor(function.name,
-                                 levels=c("a - Traditional constant","b - Linear","c - Exp","d - Sigmoid"))) %>%
+                                 levels=c("Traditional constant",
+                                          "Linear","Exponential",
+                                          "Sigmoid"))) %>%
   filter(external_factor =="No external factor" ) %>%
-  aggregate(sim  ~ comp.com + function.name, length) %>%
+  filter(function.int==fi) %>%
+  aggregate(sim  ~ comp.com + function.int + function.name, length) %>%
   mutate(sim = sim/1500) %>%
   ggplot(aes( fill=as.factor(comp.com),
                              x=as.factor(comp.com),
               y=sim)) +
-  geom_bar(stat="identity",color="black")+
+  geom_bar(stat="identity",color="black") +
   #labels=c("run away population","no species","1-species","2-species")) +
   #scale_color_manual(values = darken(cols_interaction,
   #                                   amount = .1)) + 
   #scale_pattern_fill_manual(values = my_cols) + 
   scale_fill_manual(
     values = cols_interaction) + 
-  facet_wrap(.~function.name,nrow=1) +
+  #facet_wrap(.~function.name,nrow=1) +
   theme_minimal() +
   labs(y="",
        fill="Community trajectory",
-       x="")+
+       x="",
+       title=title.vec[fi]) +
   #title="Number of communities with one or two species \nhaving a positive or null growth rate \nwhen low AND a positive abundance")+
   guides(color="none") +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1))+
-  scale_x_discrete(labels=c("run away",
-                            "extincted",
-                            "one-species",
-                            "two-species")) + 
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1),
+                     limits=c(0,0.8)) +
+  scale_x_discrete(labels=c("runaway",
+                            "extinction",
+                            "one-species\npersistence",
+                            "coexistence")) + 
   theme( legend.key.size = unit(1, 'cm'),
-         legend.position = "bottom",
+         legend.position = 'none',#"bottom",
          strip.background = element_blank(),
          panel.spacing.x = unit(10, "mm"),
          panel.grid.minor = element_blank(),
@@ -148,16 +169,19 @@ com.comp.plot.1 <- df.min.abun.horyzontal %>%
          legend.text = element_text(size = 16, 
                                     hjust = 0, 
                                     vjust = 0.5),
+         plot.title = element_text(size=22,face="bold",hjust=0.5),
          legend.title = element_text(size = 18),
-         axis.title = element_text(size = 24),
-         axis.text.x= element_text(size=22,angle=76, vjust=0.73),
-         axis.text.y= element_text(size=22),
-         axis.title.y= element_text(size=22),
-         strip.text = element_text(size=24), 
-         plot.margin = unit(c(1,1,-2,2), "cm"))
+         axis.title = element_text(size = 20),
+         axis.text.x= element_text(size=18,angle=76,
+                                   vjust=0.65),
+         axis.text.y= element_text(size=18),
+         axis.title.y= element_text(size=18),
+         strip.text = element_text(size=20), 
+         plot.margin = unit(c(1,1,-2,0), "cm"))
+         #plot.margin = unit(c(1,1,-2,2), "cm"))
 com.comp.plot.1 
 
-com.comp.plot.2 <- df.min.abun.horyzontal %>%
+com.comp.plot.2[[fi]] <- df.min.abun.horyzontal %>%
   mutate(function.name = case_when(function.int==1 ~"Traditional\nconstant",
                                    function.int==2 ~"Linear",
                                    function.int==3 ~"Exp",
@@ -166,7 +190,8 @@ com.comp.plot.2 <- df.min.abun.horyzontal %>%
                                  levels=c("Traditional\nconstant","Linear","Exp","Sigmoid"))) %>%
   filter(external_factor =="No external factor" ) %>%
   filter(external_factor =="No external factor" ) %>%
-  aggregate(sim  ~ comp.com + function.name + Interspecific.interaction, length) %>%
+  filter(function.int==fi) %>%
+  aggregate(sim  ~ comp.com + function.name + function.int + Interspecific.interaction, length) %>%
   mutate(sim = sim/500) %>%
   ggplot(aes( fill= as.factor(comp.com),
               y=sim,
@@ -179,9 +204,9 @@ com.comp.plot.2 <- df.min.abun.horyzontal %>%
   values = cols_interaction) + 
   facet_wrap(.~function.name,nrow=1) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-  scale_x_discrete(labels = c("competition",
+  scale_x_discrete(labels = c("both compete",
                               "one compete,\n one facilitate",
-                              "facilitation")) +
+                              "both facilitate")) +
   theme_minimal() +
   labs(y="", 
        fill="Community trajectory",
@@ -196,7 +221,7 @@ com.comp.plot.2 <- df.min.abun.horyzontal %>%
                             nrow = 1,
                             title.hjust = 0.1)) +
   theme( legend.key.size = unit(1, 'cm'),
-         legend.position = c(0.5,-0.3),
+         legend.position = "none", #c(0.5,-0.8),
          strip.background = element_blank(),
          panel.spacing.x = unit(10, "mm"),
          panel.grid.minor = element_blank(),
@@ -207,30 +232,38 @@ com.comp.plot.2 <- df.min.abun.horyzontal %>%
                                     hjust = 0, 
                                     vjust = 0.5),
          legend.title = element_text(size = 18),
-         axis.title = element_text(size = 24),
-         axis.text.x= element_text(size=22,angle=76, vjust=0.73),
+         axis.title = element_text(size = 20),
+         axis.text.x= element_text(size=18,angle=76, 
+                                   vjust=0.6),
         # axis.title.y= element_blank(),
-         axis.text.y= element_text(size = 23),
-        #plot.margin = unit(c(1,0,0,1), "cm"))
-         plot.margin = unit(c(1,1,0,2), "cm"))
+         axis.text.y= element_text(size = 18), 
+         plot.margin = unit(c(1,1,0,0), "cm"))
+         #plot.margin = unit(c(1,1,0,2), "cm"))
+}
 
-com.comp.plot.2
-com.comp.plot <- ggarrange(com.comp.plot.1,
-                           com.comp.plot.2,
-         nrow=2, common.legend=T, legend="none", labels = c("a.","b."),
-         label.x = -0.5,
-         label.y = 1,
+
+com.comp.plot <- ggarrange(plotlist=c(com.comp.plot.1,
+                           com.comp.plot.2),
+         nrow=2, ncol=4,
+         common.legend=T, 
+         legend="none", labels = c("A.","B.","C.","D.",
+                                   "E.","F.","G.","H."),
+         #label.x = -0.5,
+         label.y = c(0.942,0.942,0.942,0.942,
+                     1,1,1,1),
          font.label = list(size = 20, 
                            color = "black", face = "bold",
                            family = NULL))
-
+com.comp.plot
 library(ggpubr)
 com.comp.plot <- annotate_figure(com.comp.plot, 
                                  left = textGrob("Percentage of runs",
-                                                 rot = 90, vjust = 3, hjust=0.3,
+                                                 rot = 90, vjust = 1, hjust=0.3,
                                                  gp = gpar(fontsize=21,cex = 1.3))) +
-  theme(plot.margin=grid::unit(c(0,-10,-10,-10), "mm"))
+  theme(plot.margin=grid::unit(c(0,-10,-10,0), "mm"))
 com.comp.plot 
+
+
 ggsave(com.comp.plot,
        file = "figures/com.comp.plot.pdf")
 # Poster
@@ -666,10 +699,6 @@ plot_com.comp <- full_join(df.GRWL,df.glm_all) %>%
 
 ggsave(plot_com.comp,
        file = "figures/com.comp.pdf")
-
-##########################################################################################################
-# 3. Bind all data
-##########################################################################################################
 
 
 
