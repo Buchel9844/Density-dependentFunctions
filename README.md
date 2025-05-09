@@ -17,7 +17,8 @@ Authorship of data: Members of the Mayfield lab. We want to thank John Dwyer, Cl
 
 Authorship of code: R Code was written by Lisa Buche.
 
-The Folder "Shiny" contains the code to run the ShinyApp, which is also available online
+A shiny App is available to display the 4 different functions of neighbourhood density-dependency. To play with the shiny app - run the "shiny/functions.R" code in a Rstudio session. Or open the webpage: https://lisa-buche.shinyapps.io/shiny/
+The Folder "Shiny" contains the code to run the ShinyApp. 
 
 Details of R script and their function in the folder CODE:
 
