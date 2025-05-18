@@ -123,6 +123,10 @@ seeds.graph <- ggplot(fecundity.df,aes(x=seeds,color=focal)) +
 competition.seeds <- left_join(competition.long,fecundity.df,
                                by=c("site", "focal", "crop", "reserve", "plot", "treatment"))
 
+# internal information on the intrinsic fecundity of species
+intrinsic.fecun <- read.csv("data/Aus.intrinsic.fecun.csv",
+                            header = T,stringsAsFactors = F, sep=",",
+                            na.strings=c("","NA"))
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -200,7 +204,8 @@ for(Code.focal in "LARO"){ #focal.levels
   Nmedian <- c(SpMatrix[which.max(Fecundity),])
 
   # Upper bound intrinsic fecundity
-  Fmean <- mean(Fecundity) +sd(Fecundity)
+    Fmean <- intrinsic.fecun$lambda[which(intrinsic.fecun$code==Code.focal)]
+
   
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
