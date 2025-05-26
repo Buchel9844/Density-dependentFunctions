@@ -286,6 +286,157 @@ stan_post_pred_check_pois_glow_ghigh <- function(post.draws,
   # write_csv(seed_pred_table, file = file.name)
 }
 
+stan_post_pred_check <- function(post.draws,
+                                      var_name,
+                                      stan.data,
+                                      file.name,
+                                      ...) {
+  
+  # currently using the loo package, can switch to rethinking
+  
+  # phi is the overdispersion parameter for the neg binom model
+  # mu is the mean for predicted seed number 
+  
+  # extract mu and phi
+  mu <- post.draws[[var_name]] # matrix with nrow = draws and ncol = observations
+  disp_dev <- post.draws$disp_dev
+  phi <- (disp_dev^2)^(-1)
+  
+  # generating posterior predictions
+  seed_pred <- matrix(nrow = dim(mu)[1], ncol = dim(mu)[2])
+  for (i in 1:dim(mu)[1]) {     # for each posterior draw
+    for (j in 1:dim(mu)[2]) {    # for each observation 
+      # draw from the predicted distribution
+      seed_pred[i, j] <- rnbinom(1, mu = mu[i, j], size = phi[i])
+      if(is.na(seed_pred[i, j])){
+        seed_pred[i, j] <- 0
+      }
+      if(seed_pred[i, j] > 10000){
+        seed_pred[i, j] <- 10000
+      }
+    }
+  }
+  
+  seed_pred_table <- gather(as_tibble(seed_pred),key = "key",
+                            value = "Fec")
+  seed_pred_table$obs <- rep(1:dim(mu)[1],each=dim(mu)[2])
+  seed_pred_table$iterations <- rep(1:dim(mu)[2],times=dim(mu)[1])
+  # get maximum density for plot limits
+  max.density <- max(c(apply(seed_pred, 1, function(x) {max(density(x,na.rm=T)$y)}), 
+                       max(density(stan.data)$y)))
+  max.density.x <- max(density(stan.data)$x)
+  # dev.new(noRStudioGD = T)
+  # start a plot with the first draw 
+  ppc.plot <- plot(density(seed_pred[1, ]), ylim = c(0, max.density), col = 'darkgrey',
+                   xlim =c(0,max.density.x),
+                   ylab = 'Seed density',
+                   main = 'Post. pred. check',
+                   sub = '(grey = predicted, black = observed)') 
+  for (i in 2:dim(seed_pred)[1]) {
+    # add a line for each draw
+    ppc.plot <- lines(density(seed_pred[i, ]), col = 'darkgrey')
+  }
+  # add the actual data
+  ppc.plot <- lines(density(stan.data), col = 'black', lwd = 2)  
+  print(ppc.plot)
+  
+  write_csv(seed_pred_table, file = file.name)
+}
+stan_post_pred_check_all <- function(post.draws,
+                                     var_name = 'mu',
+                                     stan.data,
+                                     main,
+                                     col1,
+                                     col2,
+                                     value.se,
+                                     ...) {
+  
+  # currently using the loo package, can switch to rethinking
+  
+  # phi is the overdispersion parameter for the neg binom model
+  # mu is the mean for predicted seed number 
+  
+  # extract mu and phi
+  mu <- post.draws[[var_name]] # matrix with nrow = draws and ncol = observations
+  disp_dev <- post.draws$disp_dev
+  phi <- (disp_dev^2)^(-1)
+  
+  
+  # generating posterior predictions
+  seed_pred <- matrix(nrow = dim(mu)[1], ncol = dim(mu)[2])
+  for (i in 1:dim(mu)[1]) {     # for each posterior draw
+    for (j in 1:dim(mu)[2]) {    # for each observation 
+      # draw from the predicted distribution
+      seed_pred[i, j] <- rnbinom(1, mu = mu[i, j], size = phi[i])  
+    }
+  }
+  
+  # get maximum density for plot limits
+  max.density <- max(c(apply(seed_pred, 1, function(x) {max(density(x)$y)}), 
+                       max(density(stan.data)$y)))
+  
+  # dev.new(noRStudioGD = T)
+  # start a plot with the first draw 
+  ppc.plot <- plot(density(seed_pred[1, ]), ylim = c(0, max.density), col = col2,
+                   ylab = 'Seed density',
+                   xlab="",
+                   main = main) 
+  for (i in 2:dim(seed_pred)[1]) {
+    # add a line for each draw
+    ppc.plot <- lines(density(seed_pred[i, ]), col = col2)
+  }
+  # add the actual data
+  ppc.plot <- lines(density(stan.data), col = col1, lwd = 2)  
+  ppc.plot <- text(labels = value.se, 
+                   y= 0.04,#max.density - max.density/10,
+                   x=50, #max(stan.data)- max(stan.data)/10,
+                   cex=1, pos=3,col="black")
+  print(ppc.plot)
+}
+
+stan_post_pred_check_APM <- function(post.draws,
+                                     var_name = 'mu',
+                                     stan.data,
+                                     file.name,
+                                     ...) {
+  
+  # currently using the loo package, can switch to rethinking
+  
+  # phi is the overdispersion parameter for the neg binom model
+  # mu is the mean for predicted seed number 
+  
+  # extract mu and phi
+  mu <- post.draws[[var_name]] # matrix with nrow = draws and ncol = observations
+  
+  # generating posterior predictions
+  seed_pred <- c()
+  for (j in 1:dim(mu)[2]) {    # for each observation 
+    # draw from the predicted distribution
+    seed_pred[ j] <- rpois(1,mu[,j])  
+  }
+  
+  
+  # get maximum density for plot limits
+  max.density <- max(c(apply(seed_pred, 1, function(x) {max(density(x)$y)}), 
+                       max(density(stan.data)$y)))
+  
+  # dev.new(noRStudioGD = T)
+  # start a plot with the first draw 
+  ppc.plot <- plot(density(seed_pred), ylim = c(0,   0.01), col = 'darkgrey',
+                   ylab = 'Seed density',
+                   main = 'Post. pred. check',
+                   sub = '(grey = predicted, black = observed)') 
+  for (i in 2:dim(seed_pred)[1]) {
+    # add a line for each draw
+    ppc.plot <- lines(density(seed_pred[i, ]), col = 'darkgrey')
+  }
+  # add the actual data
+  ppc.plot <- lines(density(stan.data), col = 'black', lwd = 2)  
+  print(ppc.plot)
+  
+  save(list(seed_pred_table), file = file.name)
+}
+
 
 
 
