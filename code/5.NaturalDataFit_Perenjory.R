@@ -94,12 +94,14 @@ competition.long <- competition.long.neigh %>%
   spread(family, abundance)  %>%# change this ti have grass /forb or native/exotic
   right_join(competition.long.focal)
 
-# Only run if not family
+# Only run if not family - all intra and inter together
 competition.long <- competition.long.neigh %>%
-  aggregate(abundance ~  functional.group + reserve + year + site + focal+ crop + site + plot + treatment, sum )%>%
-  spread(functional.group, abundance)  %>%# change this ti have grass /forb or native/exotic
+  mutate(neigh= case_when(final.code=="LARO" ~ "LARO",
+                          T~"Inter")) %>%
+  aggregate(abundance ~  neigh + reserve + year + site + focal+ crop + site + plot + treatment, sum )%>%
+  spread(neigh, abundance)  %>%# change this ti have grass /forb or native/exotic
   right_join(competition.long.focal)
-
+head(competition.long)
 #---- 1.4. Import the seeds data ----
 fecundity.df <- read.csv("/Users/lisabuche/Documents/Projects/Perenjori/data/Sevenello2022_seeds.csv",
                          header = T,stringsAsFactors = F, sep=",",
@@ -123,11 +125,10 @@ seeds.graph <- ggplot(fecundity.df,aes(x=seeds,color=focal)) +
 competition.seeds <- left_join(competition.long,fecundity.df,
                                by=c("site", "focal", "crop", "reserve", "plot", "treatment"))
 
-# internal information on the intrinsic fecundity of species
+
 intrinsic.fecun <- read.csv("data/Aus.intrinsic.fecun.csv",
                             header = T,stringsAsFactors = F, sep=",",
                             na.strings=c("","NA"))
-
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #---- 2. Run the model for each focal----
@@ -135,7 +136,7 @@ intrinsic.fecun <- read.csv("data/Aus.intrinsic.fecun.csv",
 run.diagnostic =1
 run.stan = 1
 function.grouping = 1
-grouping ="family"
+grouping ="group.all.hetero" #"group.all.hetero"  or "family"
 scale.factor <- 1
 for(Code.focal in "LARO"){ #focal.levels
  for (function.int in c(1:4)){
@@ -151,12 +152,7 @@ for(Code.focal in "LARO"){ #focal.levels
   # Next continue to extract the data needed to run the model. 
   N <- as.integer(nrow(SpDataFocal))
   Fecundity <- as.integer(SpDataFocal$seeds)  
-  if(grouping =="family"){
-  specific.focal <- tolower(SpDataFocal$family[1])
-  }else{
-    specific.focal <- tolower(SpDataFocal$functional.group[1])
-    
-  }
+  specific.focal <- "asteraceae"
   #---- 2. ABUDANCE MATRIX----
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #---- 2.1. Interaction (direct) matrix of plant with COMP ----
@@ -168,45 +164,75 @@ for(Code.focal in "LARO"){ #focal.levels
                                                               "block","unique.plot","site","treatment",
                                                               "crop","flower","seeds","individual", "species","origine","functional.group",      
                                                               "family","flowercolor","final.code","flowers",                
-                                                              "Seeds")]
+                                                              "Seeds","laro")]
+  
+  if(grouping=="family"){                                                    
+AllSpAbunds <- SpDataFocal %>% 
+  dplyr::select(all_of(c(AllSpNames)))%>%
+  mutate_at( AllSpNames, as.numeric)
+
+SpTotals <- colSums(AllSpAbunds)
+SpToKeep <- SpTotals > 30 #before for family 
+sum(SpTotals)
+NamesSpToKeep <- names(SpTotals[SpToKeep])
+Stotal <- sum(SpToKeep)
+S <- Stotal
+SpMatrix <- NULL
+SpMatrix <- as_tibble(matrix(NA, nrow = N, ncol = S+1)) # +1
+i <- 1
+SpMatrix[,S+1] <- 0
+for(s in 1:length(AllSpNames)){
+  if(SpToKeep[s] == 1){
+    if(SpTotals[s] < 5){
+      SpMatrix[,S+1] <- (SpMatrix[,S+1] + AllSpAbunds[,s])
+      
+    }else{
+      SpMatrix[,i] <- AllSpAbunds[,s]
+      i <- i + 1}
+  }else{next}
+}
+SpMatrix <-SpMatrix/scale.factor
+SpNames <- c(AllSpNames[SpToKeep],"rare")
+names(SpMatrix) <-  SpNames
+Intra <- ifelse(SpNames == "conspecific", 1, 0)
+SpMatrix[,which(SpNames ==specific.focal)] <- SpMatrix[,which(SpNames == specific.focal)] - SpMatrix[,"conspecific"]  # remove conspecific obs from focal family
+
+SpMatrix <- as.matrix(SpMatrix)
+
+}else{
   AllSpAbunds <- SpDataFocal %>% 
     dplyr::select(all_of(c(AllSpNames)))%>%
     mutate_at( AllSpNames, as.numeric)
- 
-   SpTotals <- colSums(AllSpAbunds)
-   SpToKeep <- SpTotals > 30
-   sum(SpTotals)
-   NamesSpToKeep <- names(SpTotals[SpToKeep])
-   Stotal <- sum(SpToKeep)
-   S <- Stotal
-   SpMatrix <- NULL
-   SpMatrix <- as_tibble(matrix(NA, nrow = N, ncol = S+1))
-   i <- 1
-   SpMatrix[,S+1] <- 0
+  
+  SpTotals <- colSums(AllSpAbunds)
+  SpToKeep <- SpTotals > 0 #before for family 
+  sum(SpTotals)
+  NamesSpToKeep <- names(SpTotals[SpToKeep])
+  Stotal <- sum(SpToKeep)
+  S <- Stotal
+  SpMatrix <- NULL
+  SpMatrix <- as_tibble(matrix(NA, nrow = N, ncol = S)) # +1
+  i <- 1
   for(s in 1:length(AllSpNames)){
     if(SpToKeep[s] == 1){
-      if(SpTotals[s] < 5){
-        SpMatrix[,S+1] <- (SpMatrix[,S+1] + AllSpAbunds[,s])
-
-      }else{
-     SpMatrix[,i] <- AllSpAbunds[,s]
-     i <- i + 1}
+      SpMatrix[,i] <- AllSpAbunds[,s]
+      i <- i + 1
     }else{next}
   }
-   SpMatrix <-SpMatrix/scale.factor
-   SpNames <- c(AllSpNames[SpToKeep],"rare")
-   names(SpMatrix) <-  SpNames
-   Intra <- ifelse(SpNames == "conspecific", 1, 0)
-   SpMatrix[,which(SpNames ==specific.focal)] <- SpMatrix[,which(SpNames == specific.focal)] - SpMatrix[,"conspecific"]  # remove conspecific obs from focal family
+  SpMatrix <-SpMatrix/scale.factor
+  SpNames <- c(AllSpNames[SpToKeep])
+  names(SpMatrix) <-  SpNames
+  Intra <- ifelse(SpNames == "conspecific", 1, 0)
+  SpMatrix[,which(SpNames ==specific.focal)] <- SpMatrix[,which(SpNames == specific.focal)] - SpMatrix[,"conspecific"]  # remove conspecific obs from focal family
   
-   SpMatrix <- as.matrix(SpMatrix)
-  # max fecundity
+  SpMatrix <- as.matrix(SpMatrix)
+  S= S-1
+}
+  
   Nmedian <- c(SpMatrix[which.max(Fecundity),])
 
   # Upper bound intrinsic fecundity
-    Fmean <- intrinsic.fecun$lambda[which(intrinsic.fecun$code==Code.focal)]
-
-  
+  Fmean <- intrinsic.fecun$lambda[which(intrinsic.fecun$code==Code.focal)]
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #---- 3. BAYES FIT----
@@ -223,8 +249,8 @@ for(Code.focal in "LARO"){ #focal.levels
   
   if(alphaFunct1==0){
     load(paste0("results/stan/Parameters_",grouping,"_",Code.focal,"_function_1",".RData"))
-    parameters <- get(paste0("Parameters_",Code.focal,"_function_1"))
-    Fmean = median(parameters$lambda)
+    parameters <- get(paste0("Parameters_",Code.focal,"_function_1_",grouping))
+   # Fmean = median(parameters$lambda)
     
   }
   DataVec <- list(N=N, 
@@ -308,11 +334,12 @@ for(Code.focal in "LARO"){ #focal.levels
   ##### Diagnostic plots and post prediction 
   pdf(paste0("figures/stan/FinalFit_",grouping,"_",Code.focal,"_",alpha.function,".pdf"))
   # Internal checks of the behaviour of the Bayes Modelsummary(PrelimFit)
-  source("code/stan_modelcheck_rem.R") # call the functions to check diagnistic plots
+  source("code/6.1.Stan_modelcheck_rem.R") # call the functions to check diagnistic plots
   # check the distribution of Rhats and effective sample sizes 
   ##### Posterior check
   stan_post_pred_check(FinalPosteriors,"F_hat",Fecundity,
-                       paste0("results/stan/PostFec_",grouping,"_",Code.focal,"_",alpha.function,".csv.gz")) 
+                       paste0("results/stan/PostFec_",grouping,
+                              "_",Code.focal,"_",alpha.function,".csv.gz")) 
   
   #log_lik_2 <- loo::extract_log_lik(FinalFit, 
   #                                  parameter_name = "F_sim", 
@@ -354,7 +381,7 @@ for(Code.focal in "LARO"){ #focal.levels
   }
   #---- 3.3. Extract coefficients ----
   
-  assign(paste0("Parameters_",Code.focal,"_",alpha.function),
+  assign(paste0("Parameters_",Code.focal,"_",alpha.function,"_",grouping),
        list(DataVec = DataVec,
             SpNames=SpNames,
        alpha_value= FinalPosteriors$alpha_value,      
@@ -365,17 +392,17 @@ for(Code.focal in "LARO"){ #focal.levels
        N_opt = FinalPosteriors$N_opt
        ))
   
-  save(list =paste0("Parameters_",Code.focal,"_",alpha.function),
+  save(list =paste0("Parameters_",Code.focal,"_",alpha.function,"_",grouping),
        file = paste0("results/stan/Parameters_",grouping,"_",Code.focal,"_",alpha.function,".RData"))
   
   #---- 3.3. Extraction fecundity---
   
-  assign(paste0("Fsim_",Code.focal,"_",alpha.function),
+  assign(paste0("Fsim_",Code.focal,"_",alpha.function,"_",grouping),
          list(DataVec = DataVec,
               F_sim=FinalPosteriors$F_sim
          ))
   
-  save(list =paste0("Fsim_",Code.focal,"_",alpha.function),
+  save(list =paste0("Fsim_",Code.focal,"_",alpha.function,"_",grouping),
        file = paste0("results/stan/Fsim_",grouping,"_",Code.focal,"_",alpha.function,".RData"))
 
 }
@@ -386,7 +413,7 @@ for(Code.focal in "LARO"){ #focal.levels
 
 #---- 4.0. check models ----
 ModelCheck <- NULL
-grouping<- "family"
+grouping<- "family" #"family"
 for(Code.focal in "LARO"){#focal.levels
     for (function.int in c(1:4)){ # c(1:4)
       print(paste(Code.focal,", function",function.int))
@@ -409,7 +436,7 @@ write.csv(ModelCheck,
           paste0("results/ModelCheck_LARO_",grouping,".csv"))
 
 #---- 4.1 Alpha distribution ----
-
+grouping<-"family"#// "group.all.hetero" #"family"
 df_alpha_all <- data.frame(focal=NA)
 for(Code.focal in "LARO" ){ #focal.levels
   for (function.int in c(1:4)){
@@ -419,7 +446,7 @@ for(Code.focal in "LARO" ){ #focal.levels
     alpha.function <- paste0("function_",which(function.vec==1))
 
     load(paste0("results/stan/Parameters_",grouping,"_",Code.focal,"_",alpha.function,".RData"))
-    parameters <- get(paste0("Parameters_",Code.focal,"_",alpha.function))
+    parameters <- get(paste0("Parameters_",Code.focal,"_",alpha.function,"_",grouping))
     neighbours.vec <- c(parameters[["SpNames"]])
     
     N <- parameters[["DataVec"]]$N
@@ -475,51 +502,64 @@ str(df_alpha_all)
 view(df_alpha_all)
 levels(as.factor(df_alpha_all$neigh))
 source("code/1.1.PopProjection_toolbox.R")
-
+neigh.levels <- levels(as.factor(df_alpha_all$neigh))
 df_funct_alpha <- NULL
-for (n in 1:nrow(df_alpha_all)){
-  print(n)
-  df_funct_alpha_n <- df_alpha_all[n,]
+#for (n in 1:nrow(df_alpha_all)){
+
+for( fct.int in 1:4){
+  for (n in neigh.levels){
+  #print(n)
+  df_funct_alpha_n <- df_alpha_all %>% 
+    dplyr::filter(neigh==n 
+                  & function.int ==fct.int) %>%
+    dplyr::select(alpha_init,alpha_slope,alpha_c,Nmax) %>%
+    dplyr::summarise_all(list(~ median(., na.rm = TRUE)))
   df_funct_alpha_n <- data.frame(density=c(0:10),df_funct_alpha_n)
-  if(df_funct_alpha_n$function.int[1]==1){
-    df_funct_alpha_n$alpha_value <- df_funct_alpha_n$alpha_init
+  if(fct.int==1){
+    df_funct_alpha_n$alpha_value <- median(df_funct_alpha_n$alpha_init)
     
     }
-  if(df_funct_alpha_n$function.int[1]==2){
+  if(fct.int==2){
     df_funct_alpha_n$alpha_value <- alpha_function2(df_funct_alpha_n$alpha_init,
-                                                  df_funct_alpha_n$alpha_slope,
-                                                  df_funct_alpha_n$density,
-                                                  df_funct_alpha_n$Nmax)
+                                                   df_funct_alpha_n$alpha_slope,
+                                                    df_funct_alpha_n$density,
+                                                    df_funct_alpha_n$Nmax)
     
   }
-  if(df_funct_alpha_n$function.int[1]==3){
+  if(fct.int==3){
     df_funct_alpha_n$alpha_value <- alpha_function3(df_funct_alpha_n$alpha_init,
-                                                  df_funct_alpha_n$alpha_slope,
-                                                  df_funct_alpha_n$alpha_c,
+                                                    df_funct_alpha_n$alpha_slope,
+                                                   df_funct_alpha_n$alpha_c,
                                                   df_funct_alpha_n$density,
                                                   df_funct_alpha_n$Nmax)
     
   }
-  if(df_funct_alpha_n$function.int[1]==4){
-    df_funct_alpha_n$alpha_value <- alpha_function4(df_funct_alpha_n$alpha_init,
-                                                  df_funct_alpha_n$alpha_slope,
-                                                  df_funct_alpha_n$alpha_c,
-                                                  df_funct_alpha_n$density,
-                                                  df_funct_alpha_n$Nmax)
+  if(fct.int==4){
+    df_funct_alpha_n$alpha_value <- alpha_function3(median(df_funct_alpha_n$alpha_init),
+                                                    median(df_funct_alpha_n$alpha_slope),
+                                                    median(df_funct_alpha_n$alpha_c),
+                                                    df_funct_alpha_n$density,
+                                                    median(df_funct_alpha_n$Nmax))
   }
   
-  df_funct_alpha <- bind_rows(df_funct_alpha,df_funct_alpha_n )
+  df_funct_alpha <- bind_rows(df_funct_alpha,df_funct_alpha_n %>%
+                                mutate(neigh=n,
+                                       function.int =fct.int,
+                                       function.name = c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")[fct.int],
+                                       focal="LARO"))
   
 }
-
+}
 write.csv(df_funct_alpha,
           paste0("results/df_funct_alpha_LARO_",grouping,".csv.gz"))
 
-df_funct_alpha <- data.table::fread("results/df_funct_alpha_LARO_family.csv.gz")
+df_funct_alpha <- data.table::fread(paste0("results/df_funct_alpha_LARO_",grouping,".csv.gz"))
 
 cbp2 <- c("#000000", "#E69F00", "#56B4E9","#F0E442","#009E73",
           "#CC79A7", "#0072B2", "#D55E00")
-
+if(grouping=="group.all.hetero"){
+cbp2 <- c("#000000","grey")
+}
 cb2_focal <- c("#F0E442","#009E73",
                "#CC79A7", "#0072B2")
 funct.col <- c("#AA4499", "#DDCC77","#88CCEE", "#44AA99")
@@ -533,15 +573,9 @@ plot.list.alpha <- list()
 
 
 # Only LARO
-df_funct_alpha <- df_funct_alpha %>%
-  mutate(function.name = case_when(function.int==1 ~"1.Traditional",
-                                   function.int==2 ~"2.Linear",
-                                   function.int==3 ~"3.Exp",
-                                   function.int==4 ~"4.Sigmoid"))
 
-
-dummy <- data.frame(uplimit=c(0.08,1,0.30,0.15),
-                    downlimit=c(-0.08,-1,-0.1,-0.1),
+dummy <- data.frame(uplimit=c(0.08,0.25,0.30,0.15),
+                    downlimit=c(-0.08,-0.25,-0.1,-0.1),
                     function.name = c("1.Traditional","2.Linear","3.Exp","4.Sigmoid"),
                     label.title= c("a. Traditional constant",
                                    "b. Linear","c. Exponential",
@@ -565,9 +599,9 @@ for( i in c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")){
       color=neigh,fill=neigh,size=neigh,alpha=neigh)) +
     geom_hline(yintercept=0, color="black", linetype="dashed",alpha=0.6,
                size=2) +
-    geom_line(stat="smooth",method = 'gam',
-              se = TRUE,level =0.95,
-              alpha=0.8,
+    geom_line(stat="smooth",method = 'gam', # remove these line for function 1
+              se = TRUE,level =0.95,# remove these line for function 1
+              alpha=0.8,# remove these line for function 1
               size=3) +
     scale_color_manual("Neighbours identity",values=rev(cbp2)) + 
     scale_fill_manual("Neighbours identity",
@@ -618,20 +652,20 @@ plot_LAROalpha <- ggarrange( plotlist = plot_LAROalpha_list,
                              legend = "bottom",
                              align = c("hv"))
 plot_LAROalpha.2 <- annotate_figure(plot_LAROalpha , 
-                                  left = textGrob("Per capita effect of neighbours on LARO", 
-                                                  rot = 90, vjust = 0.5, #hjust=1, 
+                                  left = textGrob("Per capita effect on LARO", 
+                                                  rot = 90, vjust = 0.9, hjust=0.4, 
                                                   gp = gpar(fontsize=20,cex = 1.3)),
                                   bottom = textGrob("Density of neighbours", 
                                                     vjust=-5.2, hjust=0.4,
                                                     gp = gpar(fontsize=20,cex = 1.3))) 
 plot_LAROalpha.2
-ggsave(plot_LAROalpha,
+ggsave(plot_LAROalpha.2,
        file = "figures/NatData_plot_LARO.pdf")
 
 #---- 4.2. Population Projections ----
 
 df_param_all <- data.frame(focal=NA)
-
+grouping ="family"
 for(Code.focal in "LARO"){
   for (function.int in c(1:4)){
     #if (Code.focal == "TROR") next
@@ -640,8 +674,8 @@ for(Code.focal in "LARO"){
     function.vec[function.int] <- 1
     alpha.function <- paste0("function_",which(function.vec==1))
     
-    load(paste0("results/stan/Parameters_family_",Code.focal,"_",alpha.function,".RData"))
-    parameters <- get(paste0("Parameters_",Code.focal,"_",alpha.function))
+    load(paste0("results/stan/Parameters_",grouping,"_",Code.focal,"_",alpha.function,".RData"))
+    parameters <- get(paste0("Parameters_",Code.focal,"_",alpha.function,"_",grouping))
     N <- parameters[["DataVec"]]$N
     Nmax <- parameters[["DataVec"]]$Nmax
     neighbours.vec <- c(parameters[["SpNames"]])
@@ -708,6 +742,8 @@ scale.width.local.pred = 15 # define the width of local population
 fam.to.keep <- levels(as.factor(df_param_all$neigh))
 fam.to.keep <- fam.to.keep[which(!fam.to.keep =="rare")]
 
+fam.to.keep <- c("araliaceae","asteraceae","conspecific",
+                 "crassulaceae","goodeniaceae","montiaceae","poaceae")        
 # select only family and sum per family
 
 community_id_df_fam <- community_id_df %>% 
@@ -724,7 +760,8 @@ str(community_id_df_fam)
 
 community_id_df_LARO <- community_id_df %>% 
   dplyr::filter(code=="LARO") %>%
-  aggregate(count ~ code + year + id.plot + collector +  family + scale.width, function(x) sum(x,na.rm=T)) %>%
+  aggregate(count ~ code + year + id.plot + collector + 
+              family + scale.width, function(x) sum(x,na.rm=T)) %>%
   mutate(count=(count)*scale.width.local.pred )
 
 #----4.2.1.function to sample in the neighbours populations----
@@ -738,7 +775,8 @@ abundance.sampling.poisson <- function(a,n){
 }
 
 # code to fund the multivariate Poisson-lognormal 
-# https://cran.r-project.org/web/packages/PLNmodels/PLNmodels.pdf
+#emotes::install_github("pln-team/PLNmodels")
+#install.packages("PLNmodels")
 library(PLNmodels)
 library(ggplot2)
 library(corrplot)
@@ -760,7 +798,8 @@ ggsave(data.frame(fitted   = as.vector(fitted(myPLN)),
   geom_point(size = .5, alpha =.25 ) + 
   scale_x_log10() + 
   scale_y_log10() + 
-  theme_bw() + annotation_logticks(),
+  geom_abline(slope=1,intercept=0,color="red") +
+  theme_bw() + annotation_logticks() +theme(axis.text = element_text(size=15),axis.title = element_text(size=20)),
   file="figures/Natcoom_PLNfit.pdf")
 
 #----4.2.2.Projection ----
@@ -785,7 +824,8 @@ for(Code.focal in "LARO"){
     sd.a <-sd(community_id_df_fam$asteraceae,na.rm=T)
     state_df <- data.frame(asteraceae = round(abs(rnorm(gens,mean.a,sd.a)))) %>%
             bind_cols(round(predict_cond(myPLN,newdata =data.frame(year=c(2024:(2024+gens-1))),
-                                        cond_responses = .,type = c("response"),var_par = FALSE)))
+                                        cond_responses = .,
+                                        type = c("response"),var_par = FALSE)))
     state_df <- bind_rows(starting.df,state_df) 
       
     # matrix of 21 by 7 
@@ -801,7 +841,16 @@ for(Code.focal in "LARO"){
     }else{
       state_df$seed.total.conspecific<- state_df$conspecific/0.2 # germination rate
     }
-
+if(grouping=="group.all.hetero" ){
+  state_df <- state_df %>%
+    mutate(inter = rowSums(.[,c("araliaceae","asteraceae",
+                                "crassulaceae" ,"goodeniaceae",
+                                "montiaceae" ,"poaceae","rare")],na.rm=T)) %>%
+    dplyr::select(-c("araliaceae","asteraceae",
+                     "crassulaceae" ,"goodeniaceae",
+                     "montiaceae" ,"poaceae","rare"))
+    
+}
 for (function.int in c(1:4)){
     param.df <- df_param_all[which(df_param_all$function.int==function.int & 
                                      df_param_all$focal==Code.focal ),]
@@ -873,6 +922,7 @@ df_projection[which(df_projection$species=="conspecific"),] %>%
 
 plot_projection_list <- list()
 plot_density_projection_list <- list()
+library(ggridges)
 for( fi in 1:4 ){ #"3.Exp"
   i <- c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")[fi]
   title.vec <- c("a. Traditional constant",
@@ -1048,7 +1098,7 @@ plot_projection_legend <- ggarrange(plot_projection.2,
                                    ncol=1) 
 plot_projection_legend <-  annotate_figure(plot_projection_legend , 
                  bottom= textGrob("0.5",
-                                  vjust = -6.8,hjust=-11.6,
+                                  vjust = -6,hjust=-9.9,
                                   gp = gpar(fontsize=14,
                                             cex = 1.3,
                                             col="red"))) +
@@ -1065,7 +1115,7 @@ ggsave(plot_projection ,
 
 #----4.3.Supp Graphs----
 #----4.3.0.graph of Lambda----
-
+grouping = "family"
 df_lambda <- NULL
 for(Code.focal in "LARO" ){ #focal.levels
   for (function.int in c(1:4)){
@@ -1075,7 +1125,7 @@ for(Code.focal in "LARO" ){ #focal.levels
     alpha.function <- paste0("function_",which(function.vec==1))
     
     load(paste0("results/stan/Parameters_",grouping,"_",Code.focal,"_",alpha.function,".RData"))
-    parameters <- get(paste0("Parameters_",Code.focal,"_",alpha.function))
+    parameters <- get(paste0("Parameters_",Code.focal,"_",alpha.function,"_",grouping))
     df_lambda <- bind_rows(df_lambda,
                            data.frame(function.int=alpha.function,
                                       lambda=parameters$lambda))
@@ -1085,8 +1135,13 @@ for(Code.focal in "LARO" ){ #focal.levels
 str(df_lambda)
 library(ggridges)
 ggsave(df_lambda %>%
-  ggplot(aes(x=lambda,y=as.factor(function.int)))  +
+         mutate(function.name = case_when(function.int=="function_1" ~"1.Traditional",
+                                          function.int=="function_2" ~"2.Linear",
+                                          function.int=="function_3" ~"3.Exp",
+                                          function.int=="function_4" ~"4.Sigmoid")) %>%
+         ggplot(aes(x=lambda,y=function.name))  +
     geom_density_ridges(scale=1,quantile_lines = TRUE) +
+    labs(y="function",x="intrinsic growth rate") +
   theme_bw(),
   file="figures/NatCom_lambda.pdf")
 
@@ -1096,11 +1151,12 @@ ggsave(community_id_df_LARO %>%
          filter(count>0) %>%
          ggplot() +
          geom_histogram(aes(x=count),fill="pink",binwidth=2)+
-         labs(x="number of individuals per 15cm")+
+         labs(x=expression(number~of~individuals~per~15~"cm"^2))+
          coord_cartesian(xlim=c(0,45)) + 
          theme_clean() +
-         theme(axis.text = element_text(size=20),
-               axis.title = element_text(size=20)),
+         theme(axis.text = element_text(size=24),
+               axis.title = element_text(size=24),
+               axis.ticks = element_line(size=3)),
        file="figures/NatCom_LARODensity.pdf")
 
 #----4.3.2.graph of neighbours population density----
@@ -1221,8 +1277,9 @@ summary.proj <- df_projection[which(df_projection$species=="conspecific"),] %>%
   dplyr::select(function.name,ab.min,ab.max,ab.mean,ab.sd,ab.median,dfreedom) %>%
   unique() %>%
   ungroup() 
-summary.proj
+view(summary.proj)
 str(community_id_df_LARO )
+
 write.csv(summary.proj, file="results/summary.proj.csv")
 
 # Graph of density distribution 
@@ -1247,7 +1304,7 @@ ggsave(
           axis.title = element_text(size=16),
           strip.text =element_text(color="black",
                                    size=22)) ,
-  file="figures/density.proj.pdf")
+  file="figures/density.proj.fam.pdf")
 
 
 #---- 4.4. Compare model for each focal  ----
@@ -1296,17 +1353,17 @@ for(Code.focal in "LARO"){
   
   }
 Se_loo_model<- Se_loo_model %>%
+  mutate(across(where(is.numeric), \(x) tibble::num(x, digits = 3))) %>%
   rownames_to_column(var="model") #%>%
   #separate(col=function.int, 
   #         into=c("model","function.int"),sep="l") %>%
   #dplyr::subset(-model)
-
-
-write.csv(Se_loo_model,
+view(Se_loo_model)
+write_csv(as.data.frame(Se_loo_model),
           paste0("results/LARO_Se_loo_model.csv"))
 
 #---- 4.5. Figure of fecundity estimation distribution ----
-source("code/stan_modelcheck_rem.R")
+source("code/6.1.Stan_modelcheck_rem.R")
 function.names <- c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")
   pdf(paste0("figures/NatData_PostFecundity_distribution.pdf")) 
   par(oma=c(0,0,0,0), mar=c(2.25,2.5,2,1))
@@ -1326,13 +1383,12 @@ function.names <- c("1.Traditional","2.Linear","3.Exp","4.Sigmoid")
       col2 <- wes_palette("FantasticFox1", n = 5)
       #col1 <- c("blue","red") # focal species
       # loo values
-      value.se <- round(Se_loo_model$looic[which(Se_loo_model$model== paste0("model",function.int))],
-                        digits=2)
+      value.se <- as.numeric(Se_loo_model$looic[which(Se_loo_model$model== paste0("model",function.int))])
       # fecundity obs
       load(paste0("results/stan/Fsim_family_",Code.focal,"_function_",function.int,".RData"))
       # fecundity generated
-      Fec_df <- data.frame(Obs = 1:get(paste0("Fsim_",Code.focal,"_function_",function.int))[["DataVec"]]$N,
-                           Fec =get(paste0("Fsim_",Code.focal,"_function_",function.int))[["DataVec"]]$Fecundity)
+      Fec_df <- data.frame(Obs = 1:get(paste0("Fsim_",Code.focal,"_function_",function.int,"_",grouping))[["DataVec"]]$N,
+                           Fec =get(paste0("Fsim_",Code.focal,"_function_",function.int,"_",grouping))[["DataVec"]]$Fecundity)
       
       
       load(paste0("results/stan/FinalFit_family_",Code.focal,"_function_",function.int,".rds"))
