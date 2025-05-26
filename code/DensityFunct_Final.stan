@@ -77,7 +77,7 @@ model{
   // set regular priors
   alpha_initial ~ normal(0,0.1);
   alpha_slope ~ normal(-0.2,0.2);
-  lambda ~ normal(lambda_prior,10);
+  lambda ~ cauchy(0,10);//normal(lambda_prior,20);
   for( s in 1:S){
   N_opt[s] ~ normal(Nmedian[s],1);
   }
